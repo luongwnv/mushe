@@ -77,14 +77,6 @@ npm install
 npm run dev            # http://localhost:5173
 ```
 
-## Status (implementation phases)
-
-- [x] **Phase 0** — scaffold (web + server + migrations).
-- [x] **Phase 1** — auth (Google + email/password), lobby (create/join via RPCs), room shell.
-- [x] **Phase 2** — Realtime presence + clock-sync foundation.
-- [x] **Phase 3** — queue UI + voting (resolver `/search`, `/resolve`).
-- [x] **Phase 4** — YouTube IFrame player + both playback modes (synced / host_only).
-- [x] **Phase 5** — edge cases (tap-to-listen, host auto-advance, embedding-error skip, ad-recovery notice, late-join seek).
 
 ## Limitations (read before using)
 

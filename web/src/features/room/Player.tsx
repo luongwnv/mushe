@@ -18,6 +18,7 @@ export interface PlayerHandle {
 interface Props {
   /** Whether this client should produce sound (host always; followers in synced mode). */
   audible: boolean;
+  volume: number; // 0..100, re-applied on every track load
   onReady?: () => void;
   onEnded?: () => void;
   onError?: (code: number) => void;
@@ -26,7 +27,7 @@ interface Props {
 // Per YouTube ToS the player must stay visible/unobscured. We render a real,
 // modest-sized player rather than hiding it.
 const Player = forwardRef<PlayerHandle, Props>(function Player(
-  { audible, onReady, onEnded, onError },
+  { audible, volume, onReady, onEnded, onError },
   ref,
 ) {
   const hostElRef = useRef<HTMLDivElement>(null);
@@ -37,6 +38,8 @@ const Player = forwardRef<PlayerHandle, Props>(function Player(
   cbs.current = { onReady, onEnded, onError };
   const audibleRef = useRef(audible);
   audibleRef.current = audible;
+  const volumeRef = useRef(volume);
+  volumeRef.current = volume;
 
   useEffect(() => {
     let destroyed = false;
@@ -103,7 +106,9 @@ const Player = forwardRef<PlayerHandle, Props>(function Player(
         const p = playerRef.current;
         if (!p) return;
         p.loadVideoById(videoId, startSeconds);
-        if (audible) p.unMute();
+        // Re-apply volume and mute state after loadVideoById resets them.
+        p.setVolume(volumeRef.current);
+        if (audibleRef.current) p.unMute();
         else p.mute();
       },
       play() {

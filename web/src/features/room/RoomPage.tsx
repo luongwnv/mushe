@@ -226,6 +226,7 @@ export default function RoomPage() {
       <Player
         ref={playerRef}
         audible={unlocked}
+        volume={volume}
         onReady={() => setPlayer(playerRef.current)}
         onEnded={handleEnded}
         onError={handleError}
