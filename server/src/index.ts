@@ -1,19 +1,36 @@
 import { serve } from "@hono/node-server";
 import { Hono } from "hono";
-import { cors } from "hono/cors";
 import { z } from "zod";
-import { search, resolveOne } from "./resolution.js";
+
+// Load .env into process.env (Node >= 20.12). Must run before importing modules
+// that read process.env at load time. Safe no-op if the file is missing.
+try {
+  (process as unknown as { loadEnvFile: (p?: string) => void }).loadEnvFile?.();
+} catch {
+  // no .env file — rely on real environment variables
+}
+
+const { search, resolveOne } = await import("./resolution.js");
 
 const app = new Hono();
 
 const corsEnv = (process.env.CORS_ORIGIN ?? "http://localhost:5173").trim();
-// "*" → reflect any origin; otherwise an exact-match allowlist (comma-separated).
-const corsOrigin =
-  corsEnv === "*"
-    ? (origin: string) => origin || "*"
-    : corsEnv.split(",").map((s) => s.trim());
+const allowList = corsEnv === "*" ? null : corsEnv.split(",").map((s) => s.trim());
 
-app.use("*", cors({ origin: corsOrigin }));
+// Explicit CORS middleware — set Access-Control-Allow-Origin on every response
+// (we send no credentials, so reflecting the origin / "*" is correct). This is
+// version-independent and guarantees the header on GET, POST, and preflight.
+app.use("*", async (c, next) => {
+  const origin = c.req.header("Origin") ?? "*";
+  const allowed = allowList === null ? origin : allowList.includes(origin) ? origin : allowList[0];
+  c.header("Access-Control-Allow-Origin", allowed);
+  c.header("Vary", "Origin");
+  c.header("Access-Control-Allow-Methods", "GET,POST,OPTIONS");
+  c.header("Access-Control-Allow-Headers", "Content-Type");
+  c.header("Access-Control-Max-Age", "86400");
+  if (c.req.method === "OPTIONS") return c.body(null, 204);
+  await next();
+});
 
 const QuerySchema = z.object({ query: z.string().min(1).max(500) });
 

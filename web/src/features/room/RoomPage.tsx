@@ -27,11 +27,14 @@ export default function RoomPage() {
   const [room, setRoom] = useState<Room | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [unlocked, setUnlocked] = useState(false); // "tap to listen" gesture done
-  const [playerReady, setPlayerReady] = useState(false);
   const [localPosMs, setLocalPosMs] = useState(0);
   const [adNotice, setAdNotice] = useState(false);
 
+  // Player handle is held in state (not just a ref) so effects re-run when the
+  // YouTube player finishes loading and the imperative handle becomes available.
   const playerRef = useRef<PlayerHandle>(null);
+  const [player, setPlayer] = useState<PlayerHandle | null>(null);
+  const playerReady = player !== null;
 
   // Resolve the room by code (RLS lets members read it).
   useEffect(() => {
@@ -93,7 +96,7 @@ export default function RoomPage() {
 
   // Drive the local player to the shared clock.
   usePlaybackSync({
-    player: playerRef.current,
+    player,
     playerReady,
     playback,
     currentItem: nowPlaying,
@@ -103,13 +106,10 @@ export default function RoomPage() {
 
   // Track local player position for the progress bar / seek anchoring.
   useEffect(() => {
-    if (!active) return;
-    const id = setInterval(() => {
-      const p = playerRef.current;
-      if (p) setLocalPosMs(p.getTimeMs());
-    }, 500);
+    if (!active || !player) return;
+    const id = setInterval(() => setLocalPosMs(player.getTimeMs()), 500);
     return () => clearInterval(id);
-  }, [active]);
+  }, [active, player]);
 
   // Host auto-advance when the current track ends.
   const handleEnded = useCallback(() => {
@@ -133,13 +133,13 @@ export default function RoomPage() {
     if (!playback?.current_item_id && queued.length > 0) {
       transport.next.mutate();
     } else {
-      transport.play.mutate(playerRef.current?.getTimeMs() ?? playback?.position_ms ?? 0);
+      transport.play.mutate(player?.getTimeMs() ?? playback?.position_ms ?? 0);
     }
-  }, [playback, queued.length, transport]);
+  }, [playback, queued.length, transport, player]);
 
   const onPause = useCallback(() => {
-    transport.pause.mutate(playerRef.current?.getTimeMs() ?? 0);
-  }, [transport]);
+    transport.pause.mutate(player?.getTimeMs() ?? 0);
+  }, [transport, player]);
 
   const onSkip = useCallback(() => transport.next.mutate(), [transport]);
 
@@ -196,7 +196,7 @@ export default function RoomPage() {
       <Player
         ref={playerRef}
         audible={unlocked}
-        onReady={() => setPlayerReady(true)}
+        onReady={() => setPlayer(playerRef.current)}
         onEnded={handleEnded}
         onError={handleError}
       />

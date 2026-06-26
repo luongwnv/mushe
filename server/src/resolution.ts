@@ -6,29 +6,13 @@
 //
 // Audio bytes never flow through this service. We only resolve metadata + ids.
 
-import * as YouTubeSR from "youtube-sr";
+import { searchYouTube, loadYouTubeUrl, type LavalinkTrackInfo } from "./lavalink.js";
 import { getTrack, parseSpotifyTrackId, type SpotifyTrack } from "./spotify.js";
 
-// youtube-sr's export interop varies across CJS/ESM builds: the class with
-// .search() may sit at the namespace default, .default.default, or .YouTube.
-// Resolve whichever shape actually exposes search().
-interface YouTubeApi {
-  search(query: string, opts?: { limit?: number; type?: string }): Promise<unknown[]>;
-}
-function resolveYouTube(): YouTubeApi {
-  const candidates: unknown[] = [
-    (YouTubeSR as { default?: unknown }).default,
-    (YouTubeSR as { default?: { default?: unknown } }).default?.default,
-    (YouTubeSR as { YouTube?: unknown }).YouTube,
-    (YouTubeSR as { default?: { YouTube?: unknown } }).default?.YouTube,
-    YouTubeSR,
-  ];
-  for (const c of candidates) {
-    if (c && typeof (c as YouTubeApi).search === "function") return c as YouTubeApi;
-  }
-  throw new Error("youtube-sr: could not locate a search() function");
-}
-const YouTube = resolveYouTube();
+// YouTube search now goes through the running Lavalink node (youtube-plugin),
+// which is far more reliable than HTML scraping (youtube-sr broke on YouTube's
+// markup changes). Audio still never flows through this service — we only use
+// Lavalink for metadata + the video id, then play it in the browser IFrame.
 
 export interface ResolvedTrack {
   source: "youtube" | "spotify";
@@ -73,18 +57,13 @@ interface Candidate {
   durationMs: number | null;
 }
 
-function toCandidate(v: {
-  id?: string;
-  title?: string;
-  channel?: { name?: string } | null;
-  duration?: number; // ms in youtube-sr
-}): Candidate | null {
-  if (!v.id || !v.title) return null;
+function toCandidate(v: LavalinkTrackInfo): Candidate | null {
+  if (!v.identifier || !v.title) return null;
   return {
-    id: v.id,
+    id: v.identifier,
     title: v.title,
-    channel: v.channel?.name ?? null,
-    durationMs: typeof v.duration === "number" && v.duration > 0 ? v.duration : null,
+    channel: v.author || null,
+    durationMs: typeof v.length === "number" && v.length > 0 ? v.length : null,
   };
 }
 
@@ -135,9 +114,9 @@ function scoreCandidate(
 }
 
 async function ytSearch(query: string, limit = 8): Promise<Candidate[]> {
-  const results = await YouTube.search(query, { limit, type: "video" });
+  const results = await searchYouTube(query, limit);
   return results
-    .map((v) => toCandidate(v as Parameters<typeof toCandidate>[0]))
+    .map((v) => toCandidate(v))
     .filter((c): c is Candidate => c !== null);
 }
 
@@ -222,14 +201,12 @@ export async function search(query: string): Promise<ResolvedTrack[]> {
   const ytMatch = trimmed.match(YT_URL_RE);
   if (ytMatch) {
     const id = ytMatch[1];
-    // Pull a little metadata for display via a targeted search.
-    const [first] = await ytSearch(id, 1);
-    return [
-      candidateToTrack(
-        first ?? { id, title: trimmed, channel: null, durationMs: null },
-        { spotify: null },
-      ),
-    ];
+    // Load proper metadata for the exact video via Lavalink.
+    const info = await loadYouTubeUrl(`https://www.youtube.com/watch?v=${id}`);
+    const c = info
+      ? toCandidate(info)
+      : { id, title: trimmed, channel: null, durationMs: null };
+    return [candidateToTrack(c ?? { id, title: trimmed, channel: null, durationMs: null }, { spotify: null })];
   }
 
   return resolveText(trimmed);

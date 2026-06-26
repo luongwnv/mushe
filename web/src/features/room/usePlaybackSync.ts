@@ -45,18 +45,23 @@ export function usePlaybackSync({
 
   // Load / switch track when the current item changes.
   useEffect(() => {
-    if (!player || !playerReady || !active) return;
+    // Wait for the autoplay-unlock gesture so loadVideoById can play with sound.
+    if (!player || !playerReady || !active || !unlocked) return;
     const videoId = currentItem?.source_id ?? null;
     if (videoId && videoId !== loadedVideoRef.current) {
       loadedVideoRef.current = videoId;
       const startMs = playback ? expectedPositionMs(toClock(playback)) : 0;
-      player.load(videoId, Math.max(0, startMs / 1000));
+      player.load(videoId, Math.max(0, startMs / 1000)); // loadVideoById autoplays
+      // If the shared state says paused, immediately pause after the load.
+      if (playback && !playback.is_playing) {
+        setTimeout(() => player.pause(), 300);
+      }
     } else if (!videoId) {
       loadedVideoRef.current = null;
     }
-    // playback intentionally read at load time only
+    // playback read at load time only; re-run when the track or unlock changes
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [player, playerReady, active, currentItem?.source_id]);
+  }, [player, playerReady, active, unlocked, currentItem?.source_id]);
 
   // Drift-correction loop (~1s). Reconciles play/pause + position to the clock.
   useEffect(() => {
