@@ -32,9 +32,11 @@ const Player = forwardRef<PlayerHandle, Props>(function Player(
   const hostElRef = useRef<HTMLDivElement>(null);
   const playerRef = useRef<YT.Player | null>(null);
   const readyRef = useRef(false);
-  // keep latest callbacks without re-creating the player
+  // keep latest callbacks/audibility without re-creating the player
   const cbs = useRef({ onReady, onEnded, onError });
   cbs.current = { onReady, onEnded, onError };
+  const audibleRef = useRef(audible);
+  audibleRef.current = audible;
 
   useEffect(() => {
     let destroyed = false;
@@ -44,14 +46,22 @@ const Player = forwardRef<PlayerHandle, Props>(function Player(
         width: "100%",
         height: "100%",
         playerVars: {
-          // no related videos overlay, modest branding, no autoplay (we control it)
           rel: 0,
           modestbranding: 1,
           playsinline: 1,
+          enablejsapi: 1,
+          origin: window.location.origin,
         },
         events: {
           onReady: () => {
             readyRef.current = true;
+            // Ensure a sane starting volume and apply current audibility.
+            const p = playerRef.current;
+            if (p) {
+              p.setVolume(100);
+              if (audibleRef.current) p.unMute();
+              else p.mute();
+            }
             cbs.current.onReady?.();
           },
           onStateChange: (e) => {
@@ -73,8 +83,12 @@ const Player = forwardRef<PlayerHandle, Props>(function Player(
   useEffect(() => {
     const p = playerRef.current;
     if (!p || !readyRef.current) return;
-    if (audible) p.unMute();
-    else p.mute();
+    if (audible) {
+      p.unMute();
+      if (p.getVolume() === 0) p.setVolume(100);
+    } else {
+      p.mute();
+    }
   }, [audible]);
 
   useImperativeHandle(

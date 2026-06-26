@@ -90,10 +90,13 @@ function scoreCandidate(
     else score -= 30; // very different length => probably wrong version
   }
 
-  // Channel trust.
+  // Channel trust. "- Topic" channels are YouTube's auto-generated official
+  // audio — they're almost always embeddable, unlike official MV channels which
+  // frequently disable embedding (causing the IFrame "An error occurred"). Boost
+  // them heavily so playable results win.
   const channel = (c.channel ?? "").toLowerCase();
-  if (channel.endsWith("- topic")) score += 25;
-  if (channel.includes("vevo") || channel.includes("official")) score += 15;
+  if (channel.endsWith("- topic")) score += 60;
+  else if (channel.includes("vevo") || channel.includes("official")) score += 10;
 
   // Title / artist token overlap.
   for (const tok of wantTitle.split(" ")) {

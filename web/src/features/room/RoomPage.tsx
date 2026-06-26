@@ -29,7 +29,7 @@ export default function RoomPage() {
   const [error, setError] = useState<string | null>(null);
   const [unlocked, setUnlocked] = useState(false); // "tap to listen" gesture done
   const [localPosMs, setLocalPosMs] = useState(0);
-  const [adNotice, setAdNotice] = useState(false);
+  const [errorNotice, setErrorNotice] = useState<string | null>(null);
   const [volume, setVolume] = useState(100); // local player volume 0..100
 
   // Player handle is held in state (not just a ref) so effects re-run when the
@@ -123,16 +123,22 @@ export default function RoomPage() {
     if (isHost) transport.next.mutate();
   }, [isHost, transport.next]);
 
-  // Ad interruptions briefly desync; the sync loop self-heals. Surface a hint.
-  const handleError = useCallback((code: number) => {
-    // 101/150 => embedding disabled; host should skip. 2/5/100 => other.
-    if ((code === 101 || code === 150) && isHost) {
+  // Player errors. 101/150 = embedding disabled by the uploader; 2/5/100 = bad
+  // id / HTML5 / not found. In all cases this video can't play here — skip to
+  // the next track. Any member can trigger the skip (advance_track is
+  // idempotent), and we surface a clear message.
+  const handleError = useCallback(
+    (code: number) => {
+      setErrorNotice(
+        code === 101 || code === 150
+          ? "This video can't be embedded — skipping…"
+          : "Couldn't play this video — skipping…",
+      );
+      setTimeout(() => setErrorNotice(null), 4000);
       transport.next.mutate();
-    } else {
-      setAdNotice(true);
-      setTimeout(() => setAdNotice(false), 4000);
-    }
-  }, [isHost, transport.next]);
+    },
+    [transport],
+  );
 
   // Host transport handlers (anchor on the host's local player position).
   const onPlay = useCallback(() => {
@@ -212,11 +218,8 @@ export default function RoomPage() {
   const playerSlot = (
     <div>
       {!unlocked && (
-        <button
-          onClick={() => setUnlocked(true)}
-          style={{ marginBottom: 10, width: "100%", display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 8 }}
-        >
-          <Icon name="speaker" size={16} /> Tap to listen
+        <button onClick={() => setUnlocked(true)} style={{ marginBottom: 10, width: "100%" }}>
+          Tap to listen
         </button>
       )}
       <Player
@@ -226,10 +229,8 @@ export default function RoomPage() {
         onEnded={handleEnded}
         onError={handleError}
       />
-      {adNotice && (
-        <p className="muted" style={{ fontSize: 13, marginTop: 6 }}>
-          Catching up after an interruption…
-        </p>
+      {errorNotice && (
+        <p style={{ fontSize: 13, marginTop: 6, color: "#ffcc66" }}>{errorNotice}</p>
       )}
     </div>
   );

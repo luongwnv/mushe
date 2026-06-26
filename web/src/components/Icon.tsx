@@ -15,8 +15,6 @@ export type IconName =
   | "plus"
   | "x"
   | "up"
-  | "speaker"
-  | "headphones"
   | "leave";
 
 const PATHS: Record<IconName, string> = {
@@ -37,8 +35,6 @@ const PATHS: Record<IconName, string> = {
   plus: "M12 5v14M5 12h14",
   x: "M6 6l12 12M18 6 6 18",
   up: "M12 5l7 9H5z",
-  speaker: "M9 4h6v16H9zM12 8h.01M12 14a2 2 0 1 0 0 .01",
-  headphones: "M4 13v-1a8 8 0 0 1 16 0v1M4 13h3v6H6a2 2 0 0 1-2-2zM20 13h-3v6h1a2 2 0 0 0 2-2z",
   leave: "M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9",
 };
 
