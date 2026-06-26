@@ -10,7 +10,7 @@ interface Props {
   onRemove: (itemId: string) => void;
 }
 
-// The shared, vote-ordered queue. Highest-voted first (ties: first added).
+// Spotify-style queue table: vote-ordered (highest first; ties: first added).
 export default function Queue({
   items,
   myVotes,
@@ -24,73 +24,60 @@ export default function Queue({
   }
 
   return (
-    <div style={{ display: "grid", gap: 6 }}>
-      {items.map((q, i) => {
-        const voted = myVotes.has(q.id);
-        const canRemove = isHost || q.added_by === myUserId;
-        return (
-          <div
-            key={q.id}
-            className="row"
-            style={{
-              justifyContent: "space-between",
-              background: "var(--panel)",
-              border: "1px solid var(--border)",
-              borderRadius: 8,
-              padding: "8px 10px",
-            }}
-          >
-            <div className="row" style={{ gap: 10, minWidth: 0 }}>
-              <span className="muted" style={{ width: 18, textAlign: "right" }}>
-                {i + 1}
-              </span>
-              {q.thumbnail_url && (
-                <img
-                  src={q.thumbnail_url}
-                  alt=""
-                  width={40}
-                  height={40}
-                  style={{ borderRadius: 4, objectFit: "cover" }}
-                />
-              )}
-              <div style={{ minWidth: 0 }}>
-                <div style={{ whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                  {q.title}
+    <table className="qtable">
+      <thead>
+        <tr>
+          <th className="idx">#</th>
+          <th>Title</th>
+          <th style={{ width: 110 }}>Votes</th>
+          <th style={{ width: 64, textAlign: "right" }}>⏱</th>
+          <th style={{ width: 40 }}></th>
+        </tr>
+      </thead>
+      <tbody>
+        {items.map((q, i) => {
+          const voted = myVotes.has(q.id);
+          const canRemove = isHost || q.added_by === myUserId;
+          return (
+            <tr key={q.id} className="qrow">
+              <td className="idx">{i + 1}</td>
+              <td>
+                <div className="cell-track">
+                  {q.thumbnail_url && (
+                    <img className="thumb" src={q.thumbnail_url} alt="" width={40} height={40} />
+                  )}
+                  <div className="meta">
+                    <div className="title">{q.title}</div>
+                    <div className="muted ellipsis" style={{ fontSize: 13 }}>
+                      {q.artist}
+                      {q.added_by === myUserId ? " · added by you" : ""}
+                    </div>
+                  </div>
                 </div>
-                <div className="muted" style={{ fontSize: 13 }}>
-                  {q.artist}
-                  {q.duration_ms ? ` · ${formatDuration(q.duration_ms)}` : ""}
-                </div>
-              </div>
-            </div>
-
-            <div className="row" style={{ gap: 8 }}>
-              <button
-                className="secondary"
-                onClick={() => onToggleVote(q.id, voted)}
-                title={voted ? "Remove your vote" : "Upvote"}
-                style={{
-                  padding: "6px 12px",
-                  background: voted ? "var(--accent)" : "var(--panel-2)",
-                  color: voted ? "#0b0b0b" : "var(--text)",
-                }}
-              >
-                ▲ {q.vote_count}
-              </button>
-              {canRemove && (
+              </td>
+              <td>
                 <button
-                  className="secondary"
-                  onClick={() => onRemove(q.id)}
-                  title="Remove"
-                  style={{ padding: "6px 10px" }}
+                  className={voted ? "votebtn on" : "votebtn"}
+                  onClick={() => onToggleVote(q.id, voted)}
+                  title={voted ? "Remove your vote" : "Upvote"}
                 >
-                  ✕
+                  ▲ {q.vote_count}
                 </button>
-              )}
-            </div>
-          </div>
-        );
-      })}
-    </div>
+              </td>
+              <td className="muted" style={{ textAlign: "right" }}>
+                {formatDuration(q.duration_ms)}
+              </td>
+              <td>
+                {canRemove && (
+                  <button className="iconbtn" onClick={() => onRemove(q.id)} title="Remove">
+                    ✕
+                  </button>
+                )}
+              </td>
+            </tr>
+          );
+        })}
+      </tbody>
+    </table>
   );
 }

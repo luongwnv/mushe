@@ -10,12 +10,11 @@ import { useMyVotes, usePlayback, useQueue } from "./useRoomData";
 import { useQueueActions } from "./useQueueActions";
 import { usePlaybackActions } from "./usePlaybackActions";
 import { usePlaybackSync } from "./usePlaybackSync";
-import ListenerRoster from "./ListenerRoster";
 import SearchBox from "./SearchBox";
 import Queue from "./Queue";
-import HostControls from "./HostControls";
 import Player, { type PlayerHandle } from "./Player";
-import { formatDuration } from "./format";
+import RightPanel from "./RightPanel";
+import PlayerBar from "./PlayerBar";
 
 // Phase 4/5: full collaborative playback. The host is the authoritative clock;
 // every audible client reconciles to playback_state via usePlaybackSync.
@@ -184,122 +183,161 @@ export default function RoomPage() {
       })
     : 0;
   const displayPosMs = active ? localPosMs : sharedExpectedMs;
-  const durationMs = nowPlaying?.duration_ms ?? 0;
+
+  // The player element — rendered once here so playerRef stays in this component
+  // (the sync loop needs it). Passed into the right panel's slot.
+  const playerSlot = (
+    <div>
+      {!unlocked && (
+        <button onClick={() => setUnlocked(true)} style={{ marginBottom: 10, width: "100%" }}>
+          🔊 Tap to listen
+        </button>
+      )}
+      <Player
+        ref={playerRef}
+        audible={unlocked}
+        onReady={() => setPlayerReady(true)}
+        onEnded={handleEnded}
+        onError={handleError}
+      />
+      {adNotice && (
+        <p className="muted" style={{ fontSize: 13, marginTop: 6 }}>
+          Catching up after an interruption…
+        </p>
+      )}
+    </div>
+  );
 
   return (
-    <div style={{ padding: 24, maxWidth: 900, margin: "0 auto" }}>
-      <div className="row" style={{ justifyContent: "space-between" }}>
-        <div>
-          <h2 style={{ margin: 0 }}>{room.name}</h2>
-          <p className="muted" style={{ margin: "4px 0" }}>
-            Code <strong>{room.code}</strong> · mode {room.playback_mode}
-            {isHost && " · you’re the host"} ·{" "}
-            <span style={{ color: connected ? "var(--accent)" : "var(--muted)" }}>
-              {connected ? "live" : "connecting…"}
-            </span>
-          </p>
-        </div>
-        <button className="secondary" onClick={() => navigate("/")}>
-          Leave
+    <div className="app-shell">
+      {/* top bar */}
+      <header className="topbar">
+        <button className="iconbtn" onClick={() => navigate("/")} title="Home">
+          ⌂
         </button>
-      </div>
+        <div className="pill search">🔎 {room.name} · code {room.code}</div>
+        <span
+          className="muted"
+          style={{ color: connected ? "var(--accent)" : "var(--muted)", fontSize: 13 }}
+        >
+          {connected ? "● live" : "connecting…"}
+        </span>
+        <div className="avatar" title={isHost ? "Host" : "Listener"}>
+          {(profile?.display_name ?? "?").charAt(0).toUpperCase()}
+        </div>
+      </header>
 
-      <ListenerRoster listeners={listeners} hostId={room.host_id} />
-
-      <section style={{ marginTop: 24 }}>
-        <h3 style={{ marginBottom: 8 }}>Now playing</h3>
-
-        {/* Tap-to-listen unlocks browser autoplay with sound. */}
-        {active && !unlocked && (
-          <button onClick={() => setUnlocked(true)} style={{ marginBottom: 12 }}>
-            🔊 Tap to listen
-          </button>
-        )}
-
-        {/* The audible/active client mounts a real player (ToS: keep it visible). */}
-        {active && (
-          <div style={{ marginBottom: 12 }}>
-            <Player
-              ref={playerRef}
-              audible={unlocked}
-              onReady={() => setPlayerReady(true)}
-              onEnded={handleEnded}
-              onError={handleError}
-            />
-          </div>
-        )}
-
-        {nowPlaying ? (
-          <div>
-            <div className="row" style={{ gap: 10 }}>
-              {nowPlaying.thumbnail_url && (
-                <img
-                  src={nowPlaying.thumbnail_url}
-                  alt=""
-                  width={56}
-                  height={56}
-                  style={{ borderRadius: 6 }}
-                />
-              )}
-              <div>
-                <div>{nowPlaying.title}</div>
-                <div className="muted">{nowPlaying.artist}</div>
+      {/* 3 columns */}
+      <div className="cols">
+        {/* LEFT: room info / share */}
+        <nav className="col col-left">
+          <div className="col-scroll" style={{ display: "grid", gap: 16 }}>
+            <div className="row" style={{ justifyContent: "space-between" }}>
+              <strong>This room</strong>
+              <button className="secondary" onClick={() => navigate("/")}>
+                Leave
+              </button>
+            </div>
+            <div>
+              <div style={{ fontSize: 22, fontWeight: 700 }}>{room.name}</div>
+              <div className="muted" style={{ marginTop: 4 }}>
+                Share code
+              </div>
+              <div
+                style={{
+                  marginTop: 4,
+                  fontSize: 26,
+                  fontWeight: 800,
+                  letterSpacing: 2,
+                  color: "var(--accent)",
+                }}
+              >
+                {room.code}
               </div>
             </div>
-            <div className="muted" style={{ fontSize: 13, marginTop: 6 }}>
-              {formatDuration(displayPosMs)}
-              {durationMs ? ` / ${formatDuration(durationMs)}` : ""}
-              {!playback?.is_playing && " · paused"}
+            <div className="muted" style={{ fontSize: 13, lineHeight: 1.5 }}>
+              Anyone with the code can join, add songs, and upvote. The host
+              controls playback and the listening mode.
             </div>
           </div>
-        ) : (
-          <p className="muted">
-            Nothing playing.{" "}
-            {isHost ? "Add a song and press Play." : "Waiting for the host."}
-          </p>
-        )}
+        </nav>
 
-        {adNotice && (
-          <p className="muted" style={{ fontSize: 13 }}>
-            Catching up after an interruption…
-          </p>
-        )}
+        {/* MIDDLE: header + search + queue table */}
+        <main className="col col-mid">
+          <div className="room-header">
+            <div className="row" style={{ gap: 16 }}>
+              {isHost ? (
+                playback?.is_playing ? (
+                  <button className="play-fab" onClick={onPause} title="Pause">
+                    ⏸
+                  </button>
+                ) : (
+                  <button
+                    className="play-fab"
+                    onClick={onPlay}
+                    title="Play"
+                    disabled={!nowPlaying && queued.length === 0}
+                  >
+                    ▶
+                  </button>
+                )
+              ) : null}
+              <div>
+                <div className="muted" style={{ fontSize: 12, textTransform: "uppercase" }}>
+                  Collaborative queue
+                </div>
+                <h1 style={{ margin: "2px 0" }}>{room.name}</h1>
+                <div className="muted" style={{ fontSize: 13 }}>
+                  {listeners.length} listening · {queued.length} in queue
+                </div>
+              </div>
+            </div>
+          </div>
 
-        {isHost && (
-          <HostControls
-            playback={playback}
-            currentItem={nowPlaying}
-            hasQueued={queued.length > 0}
-            mode={mode}
-            positionMs={displayPosMs}
-            onPlay={onPlay}
-            onPause={onPause}
-            onSkip={onSkip}
-            onSeek={onSeek}
-            onChangeMode={(m) => void onChangeMode(m)}
-          />
-        )}
-      </section>
+          <div className="col-scroll" style={{ display: "grid", gap: 20 }}>
+            <div>
+              <SearchBox onAdd={(t) => addTrack.mutate(t)} adding={addTrack.isPending} />
+              {addTrack.isError && (
+                <p style={{ color: "#ff6b6b" }}>{(addTrack.error as Error).message}</p>
+              )}
+            </div>
 
-      <section style={{ marginTop: 24 }}>
-        <h3 style={{ marginBottom: 8 }}>Add a song</h3>
-        <SearchBox onAdd={(t) => addTrack.mutate(t)} adding={addTrack.isPending} />
-        {addTrack.isError && (
-          <p style={{ color: "#ff6b6b" }}>{(addTrack.error as Error).message}</p>
-        )}
-      </section>
+            <Queue
+              items={queued}
+              myVotes={myVotes ?? new Set()}
+              myUserId={session?.user.id ?? ""}
+              isHost={isHost}
+              onToggleVote={(itemId, voted) => toggleVote.mutate({ itemId, voted })}
+              onRemove={(itemId) => removeTrack.mutate(itemId)}
+            />
+          </div>
+        </main>
 
-      <section style={{ marginTop: 24 }}>
-        <h3 style={{ marginBottom: 8 }}>Queue ({queued.length})</h3>
-        <Queue
-          items={queued}
-          myVotes={myVotes ?? new Set()}
-          myUserId={session?.user.id ?? ""}
-          isHost={isHost}
-          onToggleVote={(itemId, voted) => toggleVote.mutate({ itemId, voted })}
-          onRemove={(itemId) => removeTrack.mutate(itemId)}
+        {/* RIGHT: player + now playing + listeners */}
+        <RightPanel
+          roomName={room.name}
+          playerSlot={playerSlot}
+          active={active}
+          nowPlaying={nowPlaying}
+          listeners={listeners}
+          hostId={room.host_id}
         />
-      </section>
+      </div>
+
+      {/* bottom player bar */}
+      <PlayerBar
+        isHost={!!isHost}
+        playback={playback}
+        currentItem={nowPlaying}
+        hasQueued={queued.length > 0}
+        mode={mode}
+        positionMs={displayPosMs}
+        onPlay={onPlay}
+        onPause={onPause}
+        onSkip={onSkip}
+        onSeek={onSeek}
+        onChangeMode={(m) => void onChangeMode(m)}
+      />
     </div>
   );
 }
