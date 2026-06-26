@@ -6,11 +6,14 @@ import { search, resolveOne } from "./resolution.js";
 
 const app = new Hono();
 
-const origins = (process.env.CORS_ORIGIN ?? "http://localhost:5173")
-  .split(",")
-  .map((s) => s.trim());
+const corsEnv = (process.env.CORS_ORIGIN ?? "http://localhost:5173").trim();
+// "*" → reflect any origin; otherwise an exact-match allowlist (comma-separated).
+const corsOrigin =
+  corsEnv === "*"
+    ? (origin: string) => origin || "*"
+    : corsEnv.split(",").map((s) => s.trim());
 
-app.use("*", cors({ origin: origins }));
+app.use("*", cors({ origin: corsOrigin }));
 
 const QuerySchema = z.object({ query: z.string().min(1).max(500) });
 

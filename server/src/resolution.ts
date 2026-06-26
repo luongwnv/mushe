@@ -6,8 +6,29 @@
 //
 // Audio bytes never flow through this service. We only resolve metadata + ids.
 
-import YouTube from "youtube-sr";
+import * as YouTubeSR from "youtube-sr";
 import { getTrack, parseSpotifyTrackId, type SpotifyTrack } from "./spotify.js";
+
+// youtube-sr's export interop varies across CJS/ESM builds: the class with
+// .search() may sit at the namespace default, .default.default, or .YouTube.
+// Resolve whichever shape actually exposes search().
+interface YouTubeApi {
+  search(query: string, opts?: { limit?: number; type?: string }): Promise<unknown[]>;
+}
+function resolveYouTube(): YouTubeApi {
+  const candidates: unknown[] = [
+    (YouTubeSR as { default?: unknown }).default,
+    (YouTubeSR as { default?: { default?: unknown } }).default?.default,
+    (YouTubeSR as { YouTube?: unknown }).YouTube,
+    (YouTubeSR as { default?: { YouTube?: unknown } }).default?.YouTube,
+    YouTubeSR,
+  ];
+  for (const c of candidates) {
+    if (c && typeof (c as YouTubeApi).search === "function") return c as YouTubeApi;
+  }
+  throw new Error("youtube-sr: could not locate a search() function");
+}
+const YouTube = resolveYouTube();
 
 export interface ResolvedTrack {
   source: "youtube" | "spotify";
