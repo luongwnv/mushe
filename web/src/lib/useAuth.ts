@@ -38,6 +38,43 @@ export async function signInWithGoogle(): Promise<void> {
   });
 }
 
+export interface EmailAuthResult {
+  /** True when sign-up succeeded but the email still needs confirming. */
+  needsConfirmation: boolean;
+}
+
+/**
+ * Sign up with email + password. Supabase sends a confirmation email; the link
+ * brings the user back to /auth/callback where the session is established.
+ */
+export async function signUpWithEmail(
+  email: string,
+  password: string,
+): Promise<EmailAuthResult> {
+  const { data, error } = await supabase.auth.signUp({
+    email,
+    password,
+    options: { emailRedirectTo: `${window.location.origin}/auth/callback` },
+  });
+  if (error) throw error;
+  // When confirmation is required, Supabase returns a user but no session.
+  return { needsConfirmation: !data.session };
+}
+
+export async function signInWithEmail(email: string, password: string): Promise<void> {
+  const { error } = await supabase.auth.signInWithPassword({ email, password });
+  if (error) throw error;
+}
+
+export async function resendConfirmation(email: string): Promise<void> {
+  const { error } = await supabase.auth.resend({
+    type: "signup",
+    email,
+    options: { emailRedirectTo: `${window.location.origin}/auth/callback` },
+  });
+  if (error) throw error;
+}
+
 export async function signOut(): Promise<void> {
   await supabase.auth.signOut();
 }
