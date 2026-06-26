@@ -6,12 +6,15 @@ import { useProfile } from "../../lib/useProfile";
 import { syncClock } from "../../lib/sync";
 import type { PresenceMeta, Room } from "../../lib/types";
 import { useRoomChannel } from "./useRoomChannel";
-import { usePlayback, useQueue } from "./useRoomData";
+import { useMyVotes, usePlayback, useQueue } from "./useRoomData";
+import { useQueueActions } from "./useQueueActions";
 import ListenerRoster from "./ListenerRoster";
+import SearchBox from "./SearchBox";
+import Queue from "./Queue";
 
-// Phase-2: loads the room, joins the realtime channel (Presence + Postgres
-// Changes), runs the clock-sync handshake. Queue UI/voting (Phase 3) and the
-// YouTube player (Phase 4) mount into the marked slots below.
+// Phase-3: room shell + realtime presence/queue + search/add/vote.
+// The YouTube player + host transport controls (Phase 4) mount into the
+// "Now playing" slot below.
 export default function RoomPage() {
   const { code } = useParams<{ code: string }>();
   const navigate = useNavigate();
@@ -59,6 +62,14 @@ export default function RoomPage() {
   // Seed fetches (patched live by the channel).
   const { data: queue = [] } = useQueue(room?.id);
   const { data: playback } = usePlayback(room?.id);
+  const { data: myVotes } = useMyVotes(room?.id);
+
+  // Mutations (add/vote/remove). roomId/userId fall back to "" before the room
+  // loads; mutations only fire from user actions once the room is present.
+  const { addTrack, removeTrack, toggleVote } = useQueueActions({
+    roomId: room?.id ?? "",
+    userId: session?.user.id ?? "",
+  });
 
   if (error) {
     return (
@@ -75,6 +86,7 @@ export default function RoomPage() {
 
   const isHost = session?.user.id === room.host_id;
   const nowPlaying = queue.find((q) => q.status === "playing") ?? null;
+  const queued = queue.filter((q) => q.status === "queued");
 
   return (
     <div style={{ padding: 24, maxWidth: 900, margin: "0 auto" }}>
@@ -122,10 +134,24 @@ export default function RoomPage() {
         )}
       </section>
 
-      {/* Phase 3: <SearchBox /> + <Queue /> with realtime + voting */}
       <section style={{ marginTop: 24 }}>
-        <h3 style={{ marginBottom: 8 }}>Queue ({queue.filter((q) => q.status === "queued").length})</h3>
-        <p className="muted">Search, add, and voting land in Phase 3.</p>
+        <h3 style={{ marginBottom: 8 }}>Add a song</h3>
+        <SearchBox onAdd={(t) => addTrack.mutate(t)} adding={addTrack.isPending} />
+        {addTrack.isError && (
+          <p style={{ color: "#ff6b6b" }}>{(addTrack.error as Error).message}</p>
+        )}
+      </section>
+
+      <section style={{ marginTop: 24 }}>
+        <h3 style={{ marginBottom: 8 }}>Queue ({queued.length})</h3>
+        <Queue
+          items={queued}
+          myVotes={myVotes ?? new Set()}
+          myUserId={session?.user.id ?? ""}
+          isHost={isHost}
+          onToggleVote={(itemId, voted) => toggleVote.mutate({ itemId, voted })}
+          onRemove={(itemId) => removeTrack.mutate(itemId)}
+        />
       </section>
     </div>
   );
