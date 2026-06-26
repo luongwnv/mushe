@@ -42,6 +42,7 @@ export interface QueueItem {
   duration_ms: number | null;
   thumbnail_url: string | null;
   vote_count: number;
+  position: number | null;
   status: QueueStatus;
   added_at: string;
   played_at: string | null;

@@ -95,12 +95,11 @@ export function useQueueActions({ roomId, userId }: UseQueueActionsArgs) {
       qc.setQueryData<QueueItem[]>(queueKey(roomId), (old) => {
         if (!old) return old;
         const byId = new Map(old.map((q) => [q.id, q]));
-        const reordered = orderedIds
-          .map((id, i) => {
-            const item = byId.get(id);
-            return item ? { ...item, position: i } : null;
-          })
-          .filter((x): x is QueueItem => x !== null);
+        const reordered: QueueItem[] = [];
+        orderedIds.forEach((id, i) => {
+          const item = byId.get(id);
+          if (item) reordered.push({ ...item, position: i });
+        });
         // append any items not in the reorder list (shouldn't happen, but safe)
         const inSet = new Set(orderedIds);
         for (const item of old) {
