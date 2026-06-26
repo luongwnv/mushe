@@ -3,6 +3,9 @@ import { supabase } from "../../lib/supabaseClient";
 import type { QueueItem, ResolvedTrack } from "../../lib/types";
 import { myVotesKey, queueKey, sortQueue } from "./useRoomData";
 
+// Re-export so callers can use the same sort when applying optimistic updates.
+export { sortQueue };
+
 // Mutations for the shared queue: add a resolved track, and upvote / retract.
 // Realtime (useRoomChannel) is the source of truth — these mutations write to
 // the DB and let the Postgres Changes echo patch every client (including us).
@@ -77,5 +80,40 @@ export function useQueueActions({ roomId, userId }: UseQueueActionsArgs) {
     },
   });
 
-  return { addTrack, removeTrack, toggleVote };
+  // Reorder: optimistically update local cache positions, then persist via RPC.
+  const reorderQueue = useMutation({
+    mutationFn: async (orderedIds: string[]) => {
+      const { error } = await supabase.rpc("reorder_queue", {
+        p_room: roomId,
+        p_ids: orderedIds,
+      });
+      if (error) throw error;
+    },
+    onMutate: async (orderedIds: string[]) => {
+      await qc.cancelQueries({ queryKey: queueKey(roomId) });
+      const prev = qc.getQueryData<QueueItem[]>(queueKey(roomId));
+      qc.setQueryData<QueueItem[]>(queueKey(roomId), (old) => {
+        if (!old) return old;
+        const byId = new Map(old.map((q) => [q.id, q]));
+        const reordered = orderedIds
+          .map((id, i) => {
+            const item = byId.get(id);
+            return item ? { ...item, position: i } : null;
+          })
+          .filter((x): x is QueueItem => x !== null);
+        // append any items not in the reorder list (shouldn't happen, but safe)
+        const inSet = new Set(orderedIds);
+        for (const item of old) {
+          if (!inSet.has(item.id)) reordered.push(item);
+        }
+        return reordered;
+      });
+      return { prev };
+    },
+    onError: (_err, _vars, ctx) => {
+      if (ctx?.prev) qc.setQueryData(queueKey(roomId), ctx.prev);
+    },
+  });
+
+  return { addTrack, removeTrack, toggleVote, reorderQueue };
 }

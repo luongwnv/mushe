@@ -15,7 +15,9 @@ export type IconName =
   | "plus"
   | "x"
   | "up"
-  | "leave";
+  | "leave"
+  | "clock"
+  | "grip";
 
 const PATHS: Record<IconName, string> = {
   play: "M8 5v14l11-7z",
@@ -36,6 +38,8 @@ const PATHS: Record<IconName, string> = {
   x: "M6 6l12 12M18 6 6 18",
   up: "M12 5l7 9H5z",
   leave: "M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9",
+  clock: "M12 2a10 10 0 1 0 0 20A10 10 0 0 0 12 2zM12 6v6l4 2",
+  grip: "M9 5h2v2H9zM13 5h2v2h-2zM9 11h2v2H9zM13 11h2v2h-2zM9 17h2v2H9zM13 17h2v2h-2z",
 };
 
 const SOLID = new Set<IconName>(["play", "pause", "prev", "next", "up"]);

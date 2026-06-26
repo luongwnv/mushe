@@ -46,6 +46,7 @@ const Player = forwardRef<PlayerHandle, Props>(function Player(
         width: "100%",
         height: "100%",
         playerVars: {
+          controls: 0,
           rel: 0,
           modestbranding: 1,
           playsinline: 1,
@@ -85,8 +86,14 @@ const Player = forwardRef<PlayerHandle, Props>(function Player(
   useEffect(() => {
     const p = playerRef.current;
     if (!p || !readyRef.current) return;
-    if (audible) p.unMute();
-    else p.mute();
+    if (audible) {
+      p.unMute();
+      // Force YouTube to apply the current volume level after unmuting —
+      // some browsers won't produce audio from unMute() alone.
+      p.setVolume(p.getVolume());
+    } else {
+      p.mute();
+    }
   }, [audible]);
 
   useImperativeHandle(
@@ -148,9 +155,17 @@ const Player = forwardRef<PlayerHandle, Props>(function Player(
         background: "#000",
         borderRadius: 8,
         overflow: "hidden",
+        position: "relative",
       }}
     >
       <div ref={hostElRef} style={{ width: "100%", height: "100%" }} />
+      <div
+        style={{
+          position: "absolute",
+          inset: 0,
+          zIndex: 10,
+        }}
+      />
     </div>
   );
 });

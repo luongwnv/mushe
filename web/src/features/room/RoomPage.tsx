@@ -82,7 +82,7 @@ export default function RoomPage() {
   const nowPlaying = queue.find((q) => q.status === "playing") ?? null;
   const queued = queue.filter((q) => q.status === "queued");
 
-  const { addTrack, removeTrack, toggleVote } = useQueueActions({
+  const { addTrack, removeTrack, toggleVote, reorderQueue } = useQueueActions({
     roomId: room?.id ?? "",
     userId: session?.user.id ?? "",
   });
@@ -113,10 +113,11 @@ export default function RoomPage() {
     return () => clearInterval(id);
   }, [active, player]);
 
-  // Apply local volume to the player.
+  // Apply local volume to the player. Re-run when unlocked changes so that
+  // the volume is pushed again right after the user taps "Tap to listen".
   useEffect(() => {
     player?.setVolume(volume);
-  }, [player, volume]);
+  }, [player, volume, unlocked]);
 
   // Host auto-advance when the current track ends.
   const handleEnded = useCallback(() => {
@@ -357,6 +358,7 @@ export default function RoomPage() {
               isHost={isHost}
               onToggleVote={(itemId, voted) => toggleVote.mutate({ itemId, voted })}
               onRemove={(itemId) => removeTrack.mutate(itemId)}
+              onReorder={(orderedIds) => reorderQueue.mutate(orderedIds)}
             />
           </div>
         </main>

@@ -128,14 +128,14 @@ export default function PlayerBar({
 
       {/* RIGHT: volume + fullscreen */}
       <div className="right-controls">
-        <Icon name="volume" />
+        <Icon name="volume" size={16} />
         <input
           type="range"
           min={0}
           max={100}
           value={volume}
           onChange={(e) => onVolume(Number(e.target.value))}
-          style={{ width: 110, accentColor: "var(--accent)" }}
+          className="vol-slider"
           title="Volume (this device)"
         />
         <button className="iconbtn" title="Fullscreen video" onClick={onFullscreen}>

@@ -43,7 +43,13 @@ export default function SearchBox({ onAdd, adding }: Props) {
         <input
           placeholder="Search a song, or paste a YouTube / Spotify link"
           value={query}
-          onChange={(e) => setQuery(e.target.value)}
+          onChange={(e) => {
+            setQuery(e.target.value);
+            if (!e.target.value.trim()) {
+              setResults([]);
+              setError(null);
+            }
+          }}
           onKeyDown={(e) => e.key === "Enter" && void run()}
           style={{ flex: 1 }}
         />
