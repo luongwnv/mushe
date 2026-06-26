@@ -1,5 +1,6 @@
 import type { QueueItem } from "../../lib/types";
 import { formatDuration } from "./format";
+import { Icon } from "../../components/Icon";
 
 interface Props {
   items: QueueItem[]; // queued items only, already sorted
@@ -30,7 +31,7 @@ export default function Queue({
           <th className="idx">#</th>
           <th>Title</th>
           <th style={{ width: 110 }}>Votes</th>
-          <th style={{ width: 64, textAlign: "right" }}>⏱</th>
+          <th style={{ width: 64, textAlign: "right" }}>Time</th>
           <th style={{ width: 40 }}></th>
         </tr>
       </thead>
@@ -60,8 +61,9 @@ export default function Queue({
                   className={voted ? "votebtn on" : "votebtn"}
                   onClick={() => onToggleVote(q.id, voted)}
                   title={voted ? "Remove your vote" : "Upvote"}
+                  style={{ display: "inline-flex", alignItems: "center", gap: 5 }}
                 >
-                  ▲ {q.vote_count}
+                  <Icon name="up" size={13} /> {q.vote_count}
                 </button>
               </td>
               <td className="muted" style={{ textAlign: "right" }}>
@@ -70,7 +72,7 @@ export default function Queue({
               <td>
                 {canRemove && (
                   <button className="iconbtn" onClick={() => onRemove(q.id)} title="Remove">
-                    ✕
+                    <Icon name="x" size={15} />
                   </button>
                 )}
               </td>

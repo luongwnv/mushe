@@ -15,6 +15,7 @@ import Queue from "./Queue";
 import Player, { type PlayerHandle } from "./Player";
 import RightPanel from "./RightPanel";
 import PlayerBar from "./PlayerBar";
+import { Icon } from "../../components/Icon";
 
 // Phase 4/5: full collaborative playback. The host is the authoritative clock;
 // every audible client reconciles to playback_state via usePlaybackSync.
@@ -211,8 +212,11 @@ export default function RoomPage() {
   const playerSlot = (
     <div>
       {!unlocked && (
-        <button onClick={() => setUnlocked(true)} style={{ marginBottom: 10, width: "100%" }}>
-          🔊 Tap to listen
+        <button
+          onClick={() => setUnlocked(true)}
+          style={{ marginBottom: 10, width: "100%", display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 8 }}
+        >
+          <Icon name="speaker" size={16} /> Tap to listen
         </button>
       )}
       <Player
@@ -235,9 +239,11 @@ export default function RoomPage() {
       {/* top bar */}
       <header className="topbar">
         <button className="iconbtn" onClick={() => navigate("/")} title="Home">
-          ⌂
+          <Icon name="home" size={18} />
         </button>
-        <div className="pill search">🔎 {room.name} · code {room.code}</div>
+        <div className="pill search" style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
+          <Icon name="search" size={15} /> {room.name} · code {room.code}
+        </div>
         <span
           className="muted"
           style={{ color: connected ? "var(--accent)" : "var(--muted)", fontSize: 13 }}
@@ -288,8 +294,8 @@ export default function RoomPage() {
                   onChange={(e) => void onChangeMode(e.target.value as PlaybackMode)}
                   style={{ width: "100%" }}
                 >
-                  <option value="synced">🔊 Synced (all devices)</option>
-                  <option value="host_only">🎧 Host only (one speaker)</option>
+                  <option value="synced">Synced (all devices)</option>
+                  <option value="host_only">Host only (one speaker)</option>
                 </select>
               ) : (
                 <div className="muted" style={{ fontSize: 13 }}>
@@ -309,22 +315,20 @@ export default function RoomPage() {
         <main className="col col-mid">
           <div className="room-header">
             <div className="row" style={{ gap: 16 }}>
-              {isHost ? (
-                playback?.is_playing ? (
-                  <button className="play-fab" onClick={onPause} title="Pause">
-                    ⏸
-                  </button>
-                ) : (
-                  <button
-                    className="play-fab"
-                    onClick={onPlay}
-                    title="Play"
-                    disabled={!nowPlaying && queued.length === 0}
-                  >
-                    ▶
-                  </button>
-                )
-              ) : null}
+              {playback?.is_playing ? (
+                <button className="play-fab" onClick={onPause} title="Pause">
+                  <Icon name="pause" size={22} />
+                </button>
+              ) : (
+                <button
+                  className="play-fab"
+                  onClick={onPlay}
+                  title="Play"
+                  disabled={!nowPlaying && queued.length === 0}
+                >
+                  <Icon name="play" size={22} />
+                </button>
+              )}
               <div>
                 <div className="muted" style={{ fontSize: 12, textTransform: "uppercase" }}>
                   Collaborative queue

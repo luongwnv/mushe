@@ -1,5 +1,6 @@
 import type { PlaybackState, QueueItem, RepeatMode } from "../../lib/types";
 import { formatDuration } from "./format";
+import { Icon } from "../../components/Icon";
 
 interface Props {
   playback: PlaybackState | null | undefined;
@@ -63,7 +64,7 @@ export default function PlayerBar({
         </div>
         {hasTrack && canRemoveCurrent && (
           <button className="iconbtn" title="Remove from queue" onClick={onRemoveCurrent}>
-            ✕
+            <Icon name="x" size={16} />
           </button>
         )}
       </div>
@@ -142,40 +143,5 @@ export default function PlayerBar({
         </button>
       </div>
     </div>
-  );
-}
-
-// Minimal inline SVG icon set (Spotify-ish).
-function Icon({ name, size = 18 }: { name: string; size?: number }) {
-  const p: Record<string, string> = {
-    play: "M8 5v14l11-7z",
-    pause: "M6 5h4v14H6zM14 5h4v14h-4z",
-    prev: "M7 6v12M19 6 9 12l10 6V6z",
-    next: "M17 6v12M5 6l10 6-10 6V6z",
-    // shuffle: two crossing arrows (Lucide-style)
-    shuffle: "M16 3h5v5M4 20 21 3M21 16v5h-5M15 15l6 6M4 4l5 5",
-    repeat: "M17 2l4 4-4 4M3 11V9a4 4 0 0 1 4-4h14M7 22l-4-4 4-4M21 13v2a4 4 0 0 1-4 4H3",
-    "repeat-one": "M17 2l4 4-4 4M3 11V9a4 4 0 0 1 4-4h14M7 22l-4-4 4-4M21 13v2a4 4 0 0 1-4 4H3M11 14v-3l-1 1",
-    volume: "M11 5 6 9H2v6h4l5 4zM15.5 8.5a5 5 0 0 1 0 7M18.5 5.5a9 9 0 0 1 0 13",
-    fullscreen: "M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5",
-  };
-  // Solid icons for play/pause/prev/next; stroked (outline) for the rest.
-  const solid = name === "play" || name === "pause";
-  const fill = solid ? "currentColor" : "none";
-  const stroke = solid ? "none" : "currentColor";
-  return (
-    <svg
-      width={size}
-      height={size}
-      viewBox="0 0 24 24"
-      fill={fill}
-      stroke={stroke}
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden
-    >
-      <path d={p[name]} />
-    </svg>
   );
 }
