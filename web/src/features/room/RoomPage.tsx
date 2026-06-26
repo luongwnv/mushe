@@ -29,6 +29,7 @@ export default function RoomPage() {
   const [unlocked, setUnlocked] = useState(false); // "tap to listen" gesture done
   const [localPosMs, setLocalPosMs] = useState(0);
   const [adNotice, setAdNotice] = useState(false);
+  const [volume, setVolume] = useState(100); // local player volume 0..100
 
   // Player handle is held in state (not just a ref) so effects re-run when the
   // YouTube player finishes loading and the imperative handle becomes available.
@@ -111,6 +112,11 @@ export default function RoomPage() {
     return () => clearInterval(id);
   }, [active, player]);
 
+  // Apply local volume to the player.
+  useEffect(() => {
+    player?.setVolume(volume);
+  }, [player, volume]);
+
   // Host auto-advance when the current track ends.
   const handleEnded = useCallback(() => {
     if (isHost) transport.next.mutate();
@@ -142,6 +148,7 @@ export default function RoomPage() {
   }, [transport, player]);
 
   const onSkip = useCallback(() => transport.next.mutate(), [transport]);
+  const onPrevious = useCallback(() => transport.previous.mutate(), [transport]);
 
   const onSeek = useCallback(
     (posMs: number) => {
@@ -150,6 +157,21 @@ export default function RoomPage() {
     },
     [transport, playback],
   );
+
+  const onToggleShuffle = useCallback(() => {
+    transport.setShuffle.mutate(!(playback?.shuffle ?? false));
+  }, [transport, playback]);
+
+  const onCycleRepeat = useCallback(() => {
+    const cur = playback?.repeat_mode ?? "off";
+    const next = cur === "off" ? "all" : cur === "all" ? "one" : "off";
+    transport.setRepeat.mutate(next);
+  }, [transport, playback]);
+
+  const onFullscreen = useCallback(() => {
+    const el = document.querySelector(".col-right iframe") as HTMLElement | null;
+    void el?.requestFullscreen?.();
+  }, []);
 
   const onChangeMode = useCallback(
     async (next: PlaybackMode) => {
@@ -255,9 +277,30 @@ export default function RoomPage() {
                 {room.code}
               </div>
             </div>
+            <div>
+              <div className="muted" style={{ fontSize: 13, marginBottom: 6 }}>
+                Listening mode
+              </div>
+              {isHost ? (
+                <select
+                  className="select"
+                  value={mode}
+                  onChange={(e) => void onChangeMode(e.target.value as PlaybackMode)}
+                  style={{ width: "100%" }}
+                >
+                  <option value="synced">🔊 Synced (all devices)</option>
+                  <option value="host_only">🎧 Host only (one speaker)</option>
+                </select>
+              ) : (
+                <div className="muted" style={{ fontSize: 13 }}>
+                  {mode === "synced" ? "Synced — playing on your device" : "Host is the speaker"}
+                </div>
+              )}
+            </div>
+
             <div className="muted" style={{ fontSize: 13, lineHeight: 1.5 }}>
-              Anyone with the code can join, add songs, and upvote. The host
-              controls playback and the listening mode.
+              Anyone with the code can join, add songs, upvote, and control
+              playback.
             </div>
           </div>
         </nav>
@@ -326,17 +369,22 @@ export default function RoomPage() {
 
       {/* bottom player bar */}
       <PlayerBar
-        isHost={!!isHost}
         playback={playback}
         currentItem={nowPlaying}
         hasQueued={queued.length > 0}
-        mode={mode}
         positionMs={displayPosMs}
+        volume={volume}
+        canRemoveCurrent={isHost || nowPlaying?.added_by === session?.user.id}
         onPlay={onPlay}
         onPause={onPause}
-        onSkip={onSkip}
+        onNext={onSkip}
+        onPrevious={onPrevious}
         onSeek={onSeek}
-        onChangeMode={(m) => void onChangeMode(m)}
+        onToggleShuffle={onToggleShuffle}
+        onCycleRepeat={onCycleRepeat}
+        onVolume={setVolume}
+        onRemoveCurrent={() => nowPlaying && removeTrack.mutate(nowPlaying.id)}
+        onFullscreen={onFullscreen}
       />
     </div>
   );

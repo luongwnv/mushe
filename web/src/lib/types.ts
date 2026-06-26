@@ -47,6 +47,8 @@ export interface QueueItem {
   played_at: string | null;
 }
 
+export type RepeatMode = "off" | "one" | "all";
+
 export interface PlaybackState {
   room_id: string;
   current_item_id: string | null;
@@ -54,6 +56,8 @@ export interface PlaybackState {
   position_ms: number;
   started_at: string | null; // server-time anchor
   updated_at: string;
+  repeat_mode: RepeatMode;
+  shuffle: boolean;
 }
 
 // Presence payload tracked on the room channel (ephemeral; not persisted).

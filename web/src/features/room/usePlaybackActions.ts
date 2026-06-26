@@ -60,7 +60,7 @@ export function usePlaybackActions({ roomId, currentItemId }: Args) {
     },
   });
 
-  // Advance to the next (highest-voted) track. Idempotent via the expected id.
+  // Advance to the next track. Idempotent via the expected id.
   const next = useMutation({
     mutationFn: async () => {
       const { error } = await supabase.rpc("advance_track", {
@@ -71,5 +71,26 @@ export function usePlaybackActions({ roomId, currentItemId }: Args) {
     },
   });
 
-  return { play, pause, seek, next };
+  const previous = useMutation({
+    mutationFn: async () => {
+      const { error } = await supabase.rpc("previous_track", { p_room: roomId });
+      if (error) throw error;
+    },
+  });
+
+  const setRepeat = useMutation({
+    mutationFn: async (mode: "off" | "one" | "all") => {
+      const { error } = await supabase.rpc("set_repeat", { p_room: roomId, p_mode: mode });
+      if (error) throw error;
+    },
+  });
+
+  const setShuffle = useMutation({
+    mutationFn: async (on: boolean) => {
+      const { error } = await supabase.rpc("set_shuffle", { p_room: roomId, p_on: on });
+      if (error) throw error;
+    },
+  });
+
+  return { play, pause, seek, next, previous, setRepeat, setShuffle };
 }

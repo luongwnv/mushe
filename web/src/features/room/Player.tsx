@@ -9,6 +9,7 @@ export interface PlayerHandle {
   pause(): void;
   seek(seconds: number): void;
   setRate(rate: number): void;
+  setVolume(volume: number): void; // 0..100
   getTimeMs(): number;
   getState(): YT.PlayerState | null;
   setMuted(muted: boolean): void;
@@ -97,6 +98,9 @@ const Player = forwardRef<PlayerHandle, Props>(function Player(
       },
       setRate(rate) {
         playerRef.current?.setPlaybackRate(rate);
+      },
+      setVolume(volume) {
+        playerRef.current?.setVolume(Math.max(0, Math.min(100, volume)));
       },
       getTimeMs() {
         const p = playerRef.current;

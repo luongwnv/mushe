@@ -301,6 +301,22 @@ input:focus {
 .transport .ctrl:hover {
   color: var(--accent);
 }
+.transport .ctrl {
+  position: relative;
+}
+.transport .ctrl.on {
+  color: var(--accent);
+}
+.transport .dot {
+  position: absolute;
+  bottom: -3px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: var(--accent);
+}
 .transport .main {
   width: 40px;
   height: 40px;
