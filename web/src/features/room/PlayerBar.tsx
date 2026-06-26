@@ -69,7 +69,15 @@ export default function PlayerBar({
       </div>
 
       {/* CENTER: transport */}
-      <div style={{ display: "grid", gap: 6, justifyItems: "center", minWidth: 320 }}>
+      <div
+        style={{
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          gap: 8,
+          minWidth: 360,
+        }}
+      >
         <div className="transport">
           <button
             className={shuffle ? "ctrl on" : "ctrl"}
@@ -84,11 +92,11 @@ export default function PlayerBar({
           </button>
           {isPlaying ? (
             <button className="main" title="Pause" onClick={onPause} disabled={!hasTrack}>
-              <Icon name="pause" />
+              <Icon name="pause" size={20} />
             </button>
           ) : (
             <button className="main" title="Play" onClick={onPlay} disabled={!canStart}>
-              <Icon name="play" />
+              <Icon name="play" size={20} />
             </button>
           )}
           <button className="ctrl" title="Next" onClick={onNext} disabled={!canStart}>
@@ -138,26 +146,27 @@ export default function PlayerBar({
 }
 
 // Minimal inline SVG icon set (Spotify-ish).
-function Icon({ name }: { name: string }) {
+function Icon({ name, size = 18 }: { name: string; size?: number }) {
   const p: Record<string, string> = {
     play: "M8 5v14l11-7z",
     pause: "M6 5h4v14H6zM14 5h4v14h-4z",
-    prev: "M6 6h2v12H6zm3.5 6 8.5 6V6z",
-    next: "M16 6h2v12h-2zM6 18l8.5-6L6 6z",
-    shuffle:
-      "M17 3h4v4M21 3l-6 6M3 7h4l10 10h4m0 0v-4m0 4-4 0M3 17h4l3-3",
-    repeat: "M17 1l4 4-4 4M3 11V9a4 4 0 0 1 4-4h14M7 23l-4-4 4-4M21 13v2a4 4 0 0 1-4 4H3",
-    "repeat-one":
-      "M17 1l4 4-4 4M3 11V9a4 4 0 0 1 4-4h14M7 23l-4-4 4-4M21 13v2a4 4 0 0 1-4 4H3M12 12v3m0-3-1 1",
-    volume: "M11 5 6 9H2v6h4l5 4zM16 9a4 4 0 0 1 0 6",
+    prev: "M7 6v12M19 6 9 12l10 6V6z",
+    next: "M17 6v12M5 6l10 6-10 6V6z",
+    // shuffle: two crossing arrows (Lucide-style)
+    shuffle: "M16 3h5v5M4 20 21 3M21 16v5h-5M15 15l6 6M4 4l5 5",
+    repeat: "M17 2l4 4-4 4M3 11V9a4 4 0 0 1 4-4h14M7 22l-4-4 4-4M21 13v2a4 4 0 0 1-4 4H3",
+    "repeat-one": "M17 2l4 4-4 4M3 11V9a4 4 0 0 1 4-4h14M7 22l-4-4 4-4M21 13v2a4 4 0 0 1-4 4H3M11 14v-3l-1 1",
+    volume: "M11 5 6 9H2v6h4l5 4zM15.5 8.5a5 5 0 0 1 0 7M18.5 5.5a9 9 0 0 1 0 13",
     fullscreen: "M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5",
   };
-  const fill = name === "play" || name === "pause" ? "currentColor" : "none";
-  const stroke = fill === "none" ? "currentColor" : "none";
+  // Solid icons for play/pause/prev/next; stroked (outline) for the rest.
+  const solid = name === "play" || name === "pause";
+  const fill = solid ? "currentColor" : "none";
+  const stroke = solid ? "none" : "currentColor";
   return (
     <svg
-      width="18"
-      height="18"
+      width={size}
+      height={size}
       viewBox="0 0 24 24"
       fill={fill}
       stroke={stroke}

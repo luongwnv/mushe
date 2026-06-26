@@ -289,27 +289,36 @@ input:focus {
 .transport {
   display: flex;
   align-items: center;
-  gap: 16px;
   justify-content: center;
+  gap: 20px;
 }
-.transport .ctrl {
-  background: transparent;
-  color: var(--text);
-  padding: 6px;
-  font-size: 18px;
-}
-.transport .ctrl:hover {
-  color: var(--accent);
-}
+/* secondary controls: borderless icon buttons, fixed box, muted until hover */
 .transport .ctrl {
   position: relative;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--muted);
+  display: grid;
+  place-items: center;
+  transition: color 0.15s ease, transform 0.1s ease;
+}
+.transport .ctrl:hover:not(:disabled) {
+  color: var(--text);
+  background: transparent;
+  transform: scale(1.06);
 }
 .transport .ctrl.on {
   color: var(--accent);
 }
+.transport .ctrl:disabled {
+  opacity: 0.35;
+}
 .transport .dot {
   position: absolute;
-  bottom: -3px;
+  bottom: 1px;
   left: 50%;
   transform: translateX(-50%);
   width: 4px;
@@ -317,31 +326,51 @@ input:focus {
   border-radius: 50%;
   background: var(--accent);
 }
+/* primary play/pause: solid white circle */
 .transport .main {
-  width: 40px;
-  height: 40px;
+  width: 42px;
+  height: 42px;
+  padding: 0;
   border-radius: 50%;
-  background: var(--text);
+  background: #fff;
   color: #0b0b0b;
   display: grid;
   place-items: center;
+  transition: transform 0.1s ease;
+}
+.transport .main:hover:not(:disabled) {
+  background: #fff;
+  transform: scale(1.06);
+}
+.transport .main:disabled {
+  opacity: 0.45;
 }
 .scrubber {
   display: flex;
   align-items: center;
   gap: 10px;
-  font-size: 12px;
+  font-size: 11px;
   color: var(--muted);
+  width: 100%;
+  max-width: 520px;
 }
 .scrubber input[type="range"] {
   flex: 1;
   accent-color: var(--accent);
+  height: 4px;
 }
 .right-controls {
   display: flex;
   align-items: center;
   justify-content: flex-end;
   gap: 10px;
+}
+.right-controls .iconbtn {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
 }
 
 .thumb {
