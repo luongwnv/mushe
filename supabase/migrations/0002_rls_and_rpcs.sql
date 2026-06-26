@@ -109,12 +109,12 @@ begin
     raise exception 'not authenticated';
   end if;
 
-  -- short, unambiguous code (no 0/O/1/I); retry on rare collision
+  -- short, unambiguous code; retry on rare collision.
+  -- Uses gen_random_uuid() (pg_catalog, always on search_path) rather than
+  -- pgcrypto's gen_random_bytes() which lives in the `extensions` schema and
+  -- isn't visible under `set search_path = public`.
   loop
-    v_code := upper(
-      substr(translate(encode(gen_random_bytes(6), 'base64'),
-             '+/=0O1Il', 'ABCDEFGH'), 1, 6)
-    );
+    v_code := upper(substr(replace(gen_random_uuid()::text, '-', ''), 1, 6));
     begin
       insert into rooms (code, name, host_id)
       values (v_code, coalesce(nullif(trim(p_name), ''), 'Untitled Room'), auth.uid())
