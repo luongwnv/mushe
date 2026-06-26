@@ -56,6 +56,16 @@ export function isClockSynced(): boolean {
   return synced;
 }
 
+/** Current server time as an ISO string — for writing playback anchors. */
+export function serverNowIso(): string {
+  return new Date(serverNow()).toISOString();
+}
+
+/** Parse a server-time ISO anchor (from playback_state.started_at) to epoch ms. */
+export function isoToServerMs(iso: string | null): number | null {
+  return iso ? new Date(iso).getTime() : null;
+}
+
 export interface PlaybackClock {
   isPlaying: boolean;
   positionMs: number;
