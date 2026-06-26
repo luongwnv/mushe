@@ -22,8 +22,10 @@ export type IconName =
 const PATHS: Record<IconName, string> = {
   play: "M8 5v14l11-7z",
   pause: "M6 5h4v14H6zM14 5h4v14h-4z",
-  prev: "M7 6v12M19 6 9 12l10 6V6z",
-  next: "M17 6v12M5 6l10 6-10 6V6z",
+  // skip-back: filled bar + left-pointing triangle
+  prev: "M6 6h2.2v12H6zM20 6v12l-9-6z",
+  // skip-forward: right-pointing triangle + filled bar
+  next: "M15.8 6H18v12h-2.2zM4 6l9 6-9 6z",
   shuffle: "M16 3h5v5M4 20 21 3M21 16v5h-5M15 15l6 6M4 4l5 5",
   repeat: "M17 2l4 4-4 4M3 11V9a4 4 0 0 1 4-4h14M7 22l-4-4 4-4M21 13v2a4 4 0 0 1-4 4H3",
   "repeat-one":

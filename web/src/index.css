@@ -305,6 +305,11 @@ input:focus {
   place-items: center;
   transition: color 0.15s ease, transform 0.1s ease;
 }
+.transport .ctrl.bright {
+  color: var(--text);
+  width: 36px;
+  height: 36px;
+}
 .transport .ctrl:hover:not(:disabled) {
   color: var(--text);
   background: transparent;

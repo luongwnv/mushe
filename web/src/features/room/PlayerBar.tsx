@@ -88,8 +88,8 @@ export default function PlayerBar({
             <Icon name="shuffle" />
             {shuffle && <span className="dot" />}
           </button>
-          <button className="ctrl" title="Previous" onClick={onPrevious} disabled={!canStart}>
-            <Icon name="prev" />
+          <button className="ctrl bright" title="Previous" onClick={onPrevious} disabled={!canStart}>
+            <Icon name="prev" size={22} />
           </button>
           {isPlaying ? (
             <button className="main" title="Pause" onClick={onPause} disabled={!hasTrack}>
@@ -100,8 +100,8 @@ export default function PlayerBar({
               <Icon name="play" size={20} />
             </button>
           )}
-          <button className="ctrl" title="Next" onClick={onNext} disabled={!canStart}>
-            <Icon name="next" />
+          <button className="ctrl bright" title="Next" onClick={onNext} disabled={!canStart}>
+            <Icon name="next" size={22} />
           </button>
           <button
             className={repeat !== "off" ? "ctrl on" : "ctrl"}
