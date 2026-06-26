@@ -79,16 +79,14 @@ const Player = forwardRef<PlayerHandle, Props>(function Player(
     };
   }, []);
 
-  // Apply mute state when audibility changes.
+  // Mute entirely when this client shouldn't produce sound (e.g. a non-host in
+  // host_only mode). When it should, leave loudness to setVolume() / the control
+  // bar — just lift the mute so the slider takes effect.
   useEffect(() => {
     const p = playerRef.current;
     if (!p || !readyRef.current) return;
-    if (audible) {
-      p.unMute();
-      if (p.getVolume() === 0) p.setVolume(100);
-    } else {
-      p.mute();
-    }
+    if (audible) p.unMute();
+    else p.mute();
   }, [audible]);
 
   useImperativeHandle(
@@ -114,7 +112,14 @@ const Player = forwardRef<PlayerHandle, Props>(function Player(
         playerRef.current?.setPlaybackRate(rate);
       },
       setVolume(volume) {
-        playerRef.current?.setVolume(Math.max(0, Math.min(100, volume)));
+        const p = playerRef.current;
+        if (!p) return;
+        const v = Math.max(0, Math.min(100, volume));
+        p.setVolume(v);
+        // The control-bar slider is the single source of truth for loudness:
+        // raising it must also lift YouTube's own mute, and dropping to 0 mutes.
+        if (v === 0) p.mute();
+        else p.unMute();
       },
       getTimeMs() {
         const p = playerRef.current;
