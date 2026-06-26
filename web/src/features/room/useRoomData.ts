@@ -27,6 +27,7 @@ export function useQueue(roomId: string | undefined) {
         .select("*")
         .eq("room_id", roomId!)
         .in("status", ["queued", "playing"])
+        .order("position", { ascending: true, nullsFirst: false })
         .order("vote_count", { ascending: false })
         .order("added_at", { ascending: true });
       if (error) throw error;
@@ -68,9 +69,12 @@ export function useMyVotes(roomId: string | undefined) {
   });
 }
 
-/** Stable comparator matching the SQL ordering (votes desc, then added asc). */
+/** Stable comparator: position first (nulls last), then votes desc, then added asc. */
 export function sortQueue(items: QueueItem[]): QueueItem[] {
   return [...items].sort((a, b) => {
+    const ap = a.position ?? Infinity;
+    const bp = b.position ?? Infinity;
+    if (ap !== bp) return ap - bp;
     if (b.vote_count !== a.vote_count) return b.vote_count - a.vote_count;
     return a.added_at < b.added_at ? -1 : a.added_at > b.added_at ? 1 : 0;
   });
