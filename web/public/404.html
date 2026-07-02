@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>mushe — listen together</title>
+    <!--
+      GitHub Pages serves this file for any unmatched route (e.g. deep links
+      like /mushe/auth/callback after an OAuth redirect). Since Pages can't do
+      server-side rewrites for a SPA, we stash the real path in a query param
+      and bounce to the app root; index.html restores it before React Router
+      mounts. See https://github.com/rafgraph/spa-github-pages.
+    -->
+    <script>
+      var base = "/mushe/";
+      var path = location.pathname.slice(base.length);
+      location.replace(
+        base + "?redirect=" + encodeURIComponent(path + location.search + location.hash),
+      );
+    </script>
+  </head>
+  <body></body>
+</html>

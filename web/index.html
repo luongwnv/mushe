@@ -10,6 +10,16 @@
   </head>
   <body>
     <div id="root"></div>
+    <!-- Restore the real path stashed by 404.html (see that file for why). -->
+    <script>
+      (function () {
+        var params = new URLSearchParams(location.search);
+        var redirect = params.get("redirect");
+        if (redirect !== null) {
+          history.replaceState(null, "", location.pathname + redirect);
+        }
+      })();
+    </script>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
