@@ -22,10 +22,16 @@ export async function handleStream(c: Context): Promise<Response> {
   }
 
   const range = c.req.header("Range");
+  // Returning a raw Response bypasses Hono's c.header()-based CORS middleware
+  // (index.ts only merges those into c.json()/c.body() responses), so the
+  // <audio> element's cross-origin request needs the header set here too.
+  const origin = c.req.header("Origin") ?? "*";
   const headers: Record<string, string> = {
     "Content-Type": CONTENT_TYPE,
     "Cache-Control": "public, max-age=86400",
     "Accept-Ranges": "bytes",
+    "Access-Control-Allow-Origin": origin,
+    Vary: "Origin",
   };
 
   if (range) {
