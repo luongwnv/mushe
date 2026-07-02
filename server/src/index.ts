@@ -11,6 +11,8 @@ try {
 }
 
 const { search, resolveOne } = await import("./resolution.js");
+const { handleStream } = await import("./stream.js");
+const { startCacheSweeper } = await import("./streamCache.js");
 
 const app = new Hono();
 
@@ -60,6 +62,12 @@ app.post("/resolve", async (c) => {
     return c.json({ error: (err as Error).message }, 502);
   }
 });
+
+// Proxies normalized audio bytes for a YouTube video id (yt-dlp + ffmpeg,
+// cached to disk). This is the only route that touches audio bytes.
+app.get("/stream/:videoId", handleStream);
+
+startCacheSweeper();
 
 const port = Number(process.env.PORT ?? 8787);
 serve({ fetch: app.fetch, port });

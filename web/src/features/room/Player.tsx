@@ -1,8 +1,23 @@
 import { forwardRef, useEffect, useImperativeHandle, useRef } from "react";
-import { ytReady } from "../../lib/ytApi";
+import { env } from "../../lib/env";
+
+// Mirrors the subset of YT.PlayerState values usePlaybackSync/RoomPage
+// compare against, so the sync loop's state machine didn't need to change
+// when the backing player switched from the YouTube IFrame to a native
+// <audio> element.
+export const PlayerState = {
+  ENDED: 0,
+  PLAYING: 1,
+  PAUSED: 2,
+  BUFFERING: 3,
+  CUED: 5,
+} as const;
+export type PlayerStateValue = (typeof PlayerState)[keyof typeof PlayerState];
 
 // Imperative handle the room uses to drive the player from the sync loop and
-// host controls. Wraps the YouTube IFrame player.
+// host controls. Wraps a native <audio> element streaming from the server's
+// /stream/:videoId proxy (yt-dlp + ffmpeg, cached) — no YouTube embed, so no
+// ads and no ad-driven desync between clients.
 export interface PlayerHandle {
   load(videoId: string, startSeconds: number): void;
   play(): void;
@@ -11,7 +26,7 @@ export interface PlayerHandle {
   setRate(rate: number): void;
   setVolume(volume: number): void; // 0..100
   getTimeMs(): number;
-  getState(): YT.PlayerState | null;
+  getState(): PlayerStateValue | null;
   setMuted(muted: boolean): void;
 }
 
@@ -24,137 +39,117 @@ interface Props {
   onError?: (code: number) => void;
 }
 
-// Audio-only: the iframe is rendered at 0x0 so only sound plays, no video.
 const Player = forwardRef<PlayerHandle, Props>(function Player(
   { audible, volume, onReady, onEnded, onError },
   ref,
 ) {
-  const hostElRef = useRef<HTMLDivElement>(null);
-  const playerRef = useRef<YT.Player | null>(null);
+  const audioRef = useRef<HTMLAudioElement>(null);
   const readyRef = useRef(false);
-  // keep latest callbacks/audibility without re-creating the player
+  const pendingStartSecondsRef = useRef(0);
   const cbs = useRef({ onReady, onEnded, onError });
   cbs.current = { onReady, onEnded, onError };
-  const audibleRef = useRef(audible);
-  audibleRef.current = audible;
-  const volumeRef = useRef(volume);
-  volumeRef.current = volume;
 
   useEffect(() => {
-    let destroyed = false;
-    void ytReady().then((YT) => {
-      if (destroyed || !hostElRef.current) return;
-      playerRef.current = new YT.Player(hostElRef.current, {
-        width: "100%",
-        height: "100%",
-        playerVars: {
-          controls: 0,
-          rel: 0,
-          modestbranding: 1,
-          playsinline: 1,
-          enablejsapi: 1,
-          origin: window.location.origin,
-        },
-        events: {
-          onReady: () => {
-            readyRef.current = true;
-            // Ensure a sane starting volume and apply current audibility.
-            const p = playerRef.current;
-            if (p) {
-              p.setVolume(100);
-              if (audibleRef.current) p.unMute();
-              else p.mute();
-            }
-            cbs.current.onReady?.();
-          },
-          onStateChange: (e) => {
-            if (e.data === YT.PlayerState.ENDED) cbs.current.onEnded?.();
-          },
-          onError: (e) => cbs.current.onError?.(e.data),
-        },
-      });
-    });
+    const el = audioRef.current;
+    if (!el) return;
+
+    const handleCanPlay = () => {
+      if (!readyRef.current) {
+        readyRef.current = true;
+        cbs.current.onReady?.();
+      }
+    };
+    const handleLoadedMetadata = () => {
+      if (pendingStartSecondsRef.current > 0) {
+        el.currentTime = pendingStartSecondsRef.current;
+        pendingStartSecondsRef.current = 0;
+      }
+    };
+    const handleEnded = () => cbs.current.onEnded?.();
+    const handleError = () => {
+      // MediaError has no YouTube-shaped numeric codes; RoomPage treats any
+      // code outside {101, 150} as a generic "couldn't play" skip, so 0 is fine.
+      cbs.current.onError?.(0);
+    };
+
+    el.addEventListener("canplay", handleCanPlay);
+    el.addEventListener("loadedmetadata", handleLoadedMetadata);
+    el.addEventListener("ended", handleEnded);
+    el.addEventListener("error", handleError);
     return () => {
-      destroyed = true;
-      playerRef.current?.destroy();
-      playerRef.current = null;
-      readyRef.current = false;
+      el.removeEventListener("canplay", handleCanPlay);
+      el.removeEventListener("loadedmetadata", handleLoadedMetadata);
+      el.removeEventListener("ended", handleEnded);
+      el.removeEventListener("error", handleError);
     };
   }, []);
 
   // Mute entirely when this client shouldn't produce sound (e.g. a non-host in
-  // host_only mode). When it should, leave loudness to setVolume() / the control
-  // bar — just lift the mute so the slider takes effect.
+  // host_only mode).
   useEffect(() => {
-    const p = playerRef.current;
-    if (!p || !readyRef.current) return;
-    if (audible) {
-      p.unMute();
-      // Force YouTube to apply the current volume level after unmuting —
-      // some browsers won't produce audio from unMute() alone.
-      p.setVolume(p.getVolume());
-    } else {
-      p.mute();
-    }
+    const el = audioRef.current;
+    if (!el) return;
+    el.muted = !audible;
   }, [audible]);
 
   useImperativeHandle(
     ref,
     (): PlayerHandle => ({
       load(videoId, startSeconds) {
-        const p = playerRef.current;
-        if (!p) return;
-        p.loadVideoById(videoId, startSeconds);
-        // Re-apply volume and mute state after loadVideoById resets them.
-        p.setVolume(volumeRef.current);
-        if (audibleRef.current) p.unMute();
-        else p.mute();
+        const el = audioRef.current;
+        if (!el) return;
+        pendingStartSecondsRef.current = startSeconds;
+        el.src = `${env.resolverUrl}/stream/${videoId}`;
+        el.volume = Math.max(0, Math.min(100, volume)) / 100;
+        el.muted = !audible;
+        el.load();
+        void el.play().catch(() => {
+          // Autoplay may be blocked until the user's unlock gesture; the sync
+          // loop retries play() on its next tick.
+        });
       },
       play() {
-        playerRef.current?.playVideo();
+        void audioRef.current?.play().catch(() => {});
       },
       pause() {
-        playerRef.current?.pauseVideo();
+        audioRef.current?.pause();
       },
       seek(seconds) {
-        playerRef.current?.seekTo(seconds, true);
+        const el = audioRef.current;
+        if (!el) return;
+        el.currentTime = seconds;
       },
       setRate(rate) {
-        playerRef.current?.setPlaybackRate(rate);
+        const el = audioRef.current;
+        if (el) el.playbackRate = rate;
       },
-      setVolume(volume) {
-        const p = playerRef.current;
-        if (!p) return;
-        const v = Math.max(0, Math.min(100, volume));
-        p.setVolume(v);
-        // The control-bar slider is the single source of truth for loudness:
-        // raising it must also lift YouTube's own mute, and dropping to 0 mutes.
-        if (v === 0) p.mute();
-        else p.unMute();
+      setVolume(vol) {
+        const el = audioRef.current;
+        if (!el) return;
+        const v = Math.max(0, Math.min(100, vol));
+        el.volume = v / 100;
       },
       getTimeMs() {
-        const p = playerRef.current;
-        return p && readyRef.current ? Math.round(p.getCurrentTime() * 1000) : 0;
+        const el = audioRef.current;
+        return el && readyRef.current ? Math.round(el.currentTime * 1000) : 0;
       },
       getState() {
-        const p = playerRef.current;
-        return p && readyRef.current ? p.getPlayerState() : null;
+        const el = audioRef.current;
+        if (!el || !readyRef.current) return null;
+        if (el.ended) return PlayerState.ENDED;
+        if (el.paused) return PlayerState.PAUSED;
+        if (el.readyState < HTMLMediaElement.HAVE_FUTURE_DATA) return PlayerState.BUFFERING;
+        return PlayerState.PLAYING;
       },
       setMuted(muted) {
-        const p = playerRef.current;
-        if (!p) return;
-        if (muted) p.mute();
-        else p.unMute();
+        const el = audioRef.current;
+        if (el) el.muted = muted;
       },
     }),
-    [audible],
+    [audible, volume],
   );
 
-  return (
-    <div style={{ width: 0, height: 0, overflow: "hidden" }}>
-      <div ref={hostElRef} style={{ width: "100%", height: "100%" }} />
-    </div>
-  );
+  return <audio ref={audioRef} style={{ display: "none" }} preload="auto" />;
 });
 
 export default Player;

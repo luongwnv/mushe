@@ -6,7 +6,7 @@ import {
   type PlaybackClock,
 } from "../../lib/sync";
 import type { PlaybackState, QueueItem } from "../../lib/types";
-import type { PlayerHandle } from "./Player";
+import { PlayerState, type PlayerHandle } from "./Player";
 
 // Drives the local player to match the shared playback_state. Used by every
 // client that mounts an audible/active player (host always; followers in synced
@@ -75,15 +75,14 @@ export function usePlaybackSync({
       const clock = toClock(playback);
       const expected = expectedPositionMs(clock);
       const local = player.getTimeMs();
-      const YTns = window.YT;
       const state = player.getState();
 
       // pause/play reconcile
       if (!clock.isPlaying) {
-        if (YTns && state === YTns.PlayerState.PLAYING) player.pause();
+        if (state === PlayerState.PLAYING) player.pause();
         return;
       }
-      if (YTns && (state === YTns.PlayerState.PAUSED || state === YTns.PlayerState.CUED)) {
+      if (state === PlayerState.PAUSED || state === PlayerState.CUED) {
         player.play();
       }
 
