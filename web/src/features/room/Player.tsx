@@ -24,8 +24,7 @@ interface Props {
   onError?: (code: number) => void;
 }
 
-// Per YouTube ToS the player must stay visible/unobscured. We render a real,
-// modest-sized player rather than hiding it.
+// Audio-only: the iframe is rendered at 0x0 so only sound plays, no video.
 const Player = forwardRef<PlayerHandle, Props>(function Player(
   { audible, volume, onReady, onEnded, onError },
   ref,
@@ -152,25 +151,8 @@ const Player = forwardRef<PlayerHandle, Props>(function Player(
   );
 
   return (
-    <div
-      style={{
-        width: "100%",
-        aspectRatio: "16 / 9",
-        maxWidth: 480,
-        background: "#000",
-        borderRadius: 8,
-        overflow: "hidden",
-        position: "relative",
-      }}
-    >
+    <div style={{ width: 0, height: 0, overflow: "hidden" }}>
       <div ref={hostElRef} style={{ width: "100%", height: "100%" }} />
-      <div
-        style={{
-          position: "absolute",
-          inset: 0,
-          zIndex: 10,
-        }}
-      />
     </div>
   );
 });

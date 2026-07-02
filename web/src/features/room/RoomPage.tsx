@@ -27,7 +27,13 @@ export default function RoomPage() {
 
   const [room, setRoom] = useState<Room | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [unlocked, setUnlocked] = useState(false); // "tap to listen" gesture done
+  // "tap to listen" gesture done — pre-satisfied if the user just clicked
+  // Create/Join on the lobby, since that click is itself a user gesture.
+  const [unlocked, setUnlocked] = useState(() => {
+    const preUnlocked = sessionStorage.getItem("mushe:autoplay-unlocked") === "1";
+    if (preUnlocked) sessionStorage.removeItem("mushe:autoplay-unlocked");
+    return preUnlocked;
+  });
   const [localPosMs, setLocalPosMs] = useState(0);
   const [errorNotice, setErrorNotice] = useState<string | null>(null);
   const [volume, setVolume] = useState(100); // local player volume 0..100

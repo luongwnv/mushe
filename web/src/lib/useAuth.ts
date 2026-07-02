@@ -31,10 +31,14 @@ export function useAuth(): AuthState {
   return { session, loading };
 }
 
+// import.meta.env.BASE_URL reflects Vite's `base` config (e.g. "/mushe/"),
+// so the redirect lands back on the deployed app path, not just the origin.
 export async function signInWithGoogle(): Promise<void> {
   await supabase.auth.signInWithOAuth({
     provider: "google",
-    options: { redirectTo: `${window.location.origin}/auth/callback` },
+    options: {
+      redirectTo: `${window.location.origin}${import.meta.env.BASE_URL}auth/callback`,
+    },
   });
 }
 
@@ -54,7 +58,7 @@ export async function signUpWithEmail(
   const { data, error } = await supabase.auth.signUp({
     email,
     password,
-    options: { emailRedirectTo: `${window.location.origin}/auth/callback` },
+    options: { emailRedirectTo: `${window.location.origin}${import.meta.env.BASE_URL}auth/callback` },
   });
   if (error) throw error;
   // When confirmation is required, Supabase returns a user but no session.
@@ -70,7 +74,7 @@ export async function resendConfirmation(email: string): Promise<void> {
   const { error } = await supabase.auth.resend({
     type: "signup",
     email,
-    options: { emailRedirectTo: `${window.location.origin}/auth/callback` },
+    options: { emailRedirectTo: `${window.location.origin}${import.meta.env.BASE_URL}auth/callback` },
   });
   if (error) throw error;
 }

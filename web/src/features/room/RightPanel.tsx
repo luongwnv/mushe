@@ -29,7 +29,7 @@ export default function RightPanel({
           {roomName}
         </div>
 
-        {/* The player lives here (visible, per YouTube ToS). */}
+        {/* The (audio-only, hidden) player mounts here. */}
         {active ? (
           playerSlot
         ) : (

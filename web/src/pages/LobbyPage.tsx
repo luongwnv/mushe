@@ -10,9 +10,16 @@ export default function LobbyPage() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Clicking Create/Join is itself a user gesture — mark autoplay as
+  // pre-unlocked so RoomPage can skip its "tap to listen" prompt.
+  function markAutoplayUnlocked() {
+    sessionStorage.setItem("mushe:autoplay-unlocked", "1");
+  }
+
   async function createRoom() {
     setBusy(true);
     setError(null);
+    markAutoplayUnlocked();
     // create_room RPC inserts the room + host membership + empty playback_state
     // and returns the shareable code.
     const { data, error } = await supabase.rpc("create_room", {
@@ -28,6 +35,7 @@ export default function LobbyPage() {
     if (!code) return;
     setBusy(true);
     setError(null);
+    markAutoplayUnlocked();
     // join_room is the only sanctioned join path (non-members can't SELECT rooms).
     const { error } = await supabase.rpc("join_room", { p_code: code });
     setBusy(false);
