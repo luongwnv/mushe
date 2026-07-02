@@ -31,6 +31,7 @@ export async function handleStream(c: Context): Promise<Response> {
     "Cache-Control": "public, max-age=86400",
     "Accept-Ranges": "bytes",
     "Access-Control-Allow-Origin": origin,
+    "Access-Control-Expose-Headers": "Content-Range, Accept-Ranges, Content-Length",
     Vary: "Origin",
   };
 
