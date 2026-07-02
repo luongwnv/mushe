@@ -53,12 +53,16 @@ const Player = forwardRef<PlayerHandle, Props>(function Player(
     const el = audioRef.current;
     if (!el) return;
 
-    const handleCanPlay = () => {
-      if (!readyRef.current) {
-        readyRef.current = true;
-        cbs.current.onReady?.();
-      }
-    };
+    // The handle is usable as soon as the <audio> element is mounted — unlike
+    // the YouTube IFrame API (which needed an external script to finish
+    // loading), there's nothing to wait for here. Signaling ready immediately
+    // lets usePlaybackSync call load() on the first render instead of
+    // deadlocking on a "canplay" event that a src-less <audio> never fires.
+    if (!readyRef.current) {
+      readyRef.current = true;
+      cbs.current.onReady?.();
+    }
+
     const handleLoadedMetadata = () => {
       if (pendingStartSecondsRef.current > 0) {
         el.currentTime = pendingStartSecondsRef.current;
@@ -72,12 +76,10 @@ const Player = forwardRef<PlayerHandle, Props>(function Player(
       cbs.current.onError?.(0);
     };
 
-    el.addEventListener("canplay", handleCanPlay);
     el.addEventListener("loadedmetadata", handleLoadedMetadata);
     el.addEventListener("ended", handleEnded);
     el.addEventListener("error", handleError);
     return () => {
-      el.removeEventListener("canplay", handleCanPlay);
       el.removeEventListener("loadedmetadata", handleLoadedMetadata);
       el.removeEventListener("ended", handleEnded);
       el.removeEventListener("error", handleError);
