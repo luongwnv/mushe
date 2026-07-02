@@ -1,18 +1,25 @@
-// Audio cache + progressive extraction pipeline.
+// Audio cache + extraction pipeline.
 //
 // yt-dlp resolves the best audio stream for a YouTube video id and pipes it
 // through ffmpeg, which remuxes/transcodes to a single normalized format
 // (AAC in an .m4a container — natively playable in every major browser,
 // including Safari, which is unreliable with webm/opus). ffmpeg writes to a
 // cache file on disk; concurrent requests for the same video id attach to
-// the same in-flight write and are served progressively as bytes land,
-// rather than waiting for the full download to finish.
+// the same in-flight extraction instead of spawning duplicates.
+//
+// The route only serves a video once it is FULLY cached (see stream.ts) —
+// serving progressively while ffmpeg was still writing let each client's
+// <audio> element seek to a different byte offset depending on its own
+// download progress, which is what caused followers joining mid-track to
+// stall indefinitely (seeking into not-yet-written bytes of a fragmented,
+// non-seekable mp4 stream). Waiting for the full file means every client
+// gets a normal, fully-seekable file and starts from the same bytes.
 //
 // Audio bytes never flow through Lavalink — Lavalink (lavalink.ts) is only
 // used for search/metadata resolution.
 
-import { spawn, type ChildProcessWithoutNullStreams } from "node:child_process";
-import { createWriteStream, existsSync } from "node:fs";
+import { spawn } from "node:child_process";
+import { existsSync } from "node:fs";
 import { mkdir, readdir, rename, rm, stat, utimes } from "node:fs/promises";
 import { join } from "node:path";
 
@@ -27,13 +34,11 @@ const CONTENT_TYPE = "audio/mp4"; // AAC-in-m4a, output of the ffmpeg normalize 
 const YT_ID_RE = /^[\w-]{11}$/;
 
 interface CacheEntry {
-  /** Bytes written to the partial/final file so far. Grows as ffmpeg writes. */
+  /** Final file size once extraction completes. */
   writtenBytes: number;
   /** Resolved once the file is fully written (success) or rejects (failure). */
   done: Promise<void>;
-  /** True once `done` has settled successfully. */
   complete: boolean;
-  waiters: Array<(n: number) => void>;
 }
 
 const inFlight = new Map<string, CacheEntry>();
@@ -111,10 +116,11 @@ function startExtraction(videoId: string, entry: CacheEntry): void {
     { stdio: ["ignore", "pipe", "pipe"] },
   );
 
-  // ffmpeg: normalize whatever container/codec yt-dlp yields to AAC/m4a,
-  // faststart so the moov atom is at the front (needed for progressive
-  // playback / seeking before the whole file is written).
-  const ffmpeg: ChildProcessWithoutNullStreams = spawn(
+  // ffmpeg: normalize whatever container/codec yt-dlp yields to AAC/m4a and
+  // write straight to the part file. faststart (moov atom moved to the
+  // front) requires ffmpeg to seek on its output, which isn't possible on a
+  // pipe — so ffmpeg writes the file itself rather than us piping its stdout.
+  const ffmpeg = spawn(
     FFMPEG_PATH,
     [
       "-i",
@@ -125,12 +131,13 @@ function startExtraction(videoId: string, entry: CacheEntry): void {
       "-b:a",
       "192k",
       "-movflags",
-      "frag_keyframe+empty_moov+faststart",
+      "faststart",
       "-f",
       "mp4",
-      "pipe:1",
+      "-y",
+      part,
     ],
-    { stdio: ["pipe", "pipe", "pipe"] },
+    { stdio: ["pipe", "ignore", "pipe"] },
   );
 
   ytdlp.stdout.pipe(ffmpeg.stdin);
@@ -142,26 +149,18 @@ function startExtraction(videoId: string, entry: CacheEntry): void {
   });
 
   entry.done = new Promise<void>((resolve, reject) => {
-    const fsWrite = createWriteStream(part);
-    ffmpeg.stdout.pipe(fsWrite);
-
-    ffmpeg.stdout.on("data", (chunk: Buffer) => {
-      entry.writtenBytes += chunk.length;
-      const waiters = entry.waiters;
-      entry.waiters = [];
-      for (const w of waiters) w(entry.writtenBytes);
-    });
-
     let ytdlpExitCode: number | null = null;
-    let ffmpegExitCode: number | null = null;
     let settled = false;
+
+    const cleanupFailed = () => {
+      rm(part, { force: true }).catch(() => {});
+    };
 
     const maybeFail = () => {
       if (settled) return;
       if (ytdlpExitCode !== null && ytdlpExitCode !== 0) {
         settled = true;
-        fsWrite.destroy();
-        rm(part, { force: true }).catch(() => {});
+        cleanupFailed();
         reject(classifyYtDlpError(stderr));
       }
     };
@@ -169,15 +168,13 @@ function startExtraction(videoId: string, entry: CacheEntry): void {
     ytdlp.on("error", (err) => {
       if (settled) return;
       settled = true;
-      fsWrite.destroy();
-      rm(part, { force: true }).catch(() => {});
+      cleanupFailed();
       reject(new ExtractionError(`failed to spawn yt-dlp: ${err.message}`, "transient"));
     });
     ffmpeg.on("error", (err) => {
       if (settled) return;
       settled = true;
-      fsWrite.destroy();
-      rm(part, { force: true }).catch(() => {});
+      cleanupFailed();
       reject(new ExtractionError(`failed to spawn ffmpeg: ${err.message}`, "transient"));
     });
 
@@ -186,60 +183,35 @@ function startExtraction(videoId: string, entry: CacheEntry): void {
       maybeFail();
     });
 
-    ffmpeg.on("close", (code) => {
-      ffmpegExitCode = code;
+    ffmpeg.on("close", async (code) => {
       if (settled) return;
-      if (code !== 0 && (ytdlpExitCode === null || ytdlpExitCode === 0)) {
+      if (code !== 0) {
         settled = true;
-        fsWrite.destroy();
-        rm(part, { force: true }).catch(() => {});
+        cleanupFailed();
         reject(new ExtractionError(`ffmpeg exited with code ${code}`, "transient"));
         return;
       }
-    });
-
-    fsWrite.on("finish", async () => {
-      if (settled) return;
-      // ffmpeg's stdout ending (which triggers this) always precedes or
-      // coincides with its "close" event; a nonzero ffmpegExitCode will
-      // have already been observed here if ffmpeg failed. `null` means
-      // ffmpeg's stdout closed cleanly before the process "close" event
-      // was delivered — treat as success (data is what matters).
-      if (ffmpegExitCode !== null && ffmpegExitCode !== 0) return; // close handler will reject
+      if (ytdlpExitCode !== null && ytdlpExitCode !== 0) return; // maybeFail already handled it
       settled = true;
       try {
+        const stats = await stat(part);
+        entry.writtenBytes = stats.size;
         await rename(part, final);
         entry.complete = true;
-        const waiters = entry.waiters;
-        entry.waiters = [];
-        for (const w of waiters) w(entry.writtenBytes);
         resolve();
       } catch (err) {
         reject(err as Error);
       }
     });
-
-    fsWrite.on("error", (err) => {
-      if (settled) return;
-      settled = true;
-      reject(err);
-    });
   });
 }
 
 /**
- * Ensure extraction has started for `videoId` and return a handle for
- * progressive reads: `waitForBytes(n)` resolves once at least n bytes have
- * been written (or the file is complete/failed), and `path`/`isComplete()`
- * let the caller build a Range-aware response.
+ * Ensure `videoId` is fully extracted and cached to disk, then return its
+ * path. Resolves only once the whole file is written — every client always
+ * gets a complete, fully-seekable file starting from the same bytes.
  */
-export async function ensureStreaming(videoId: string): Promise<{
-  path: string;
-  isComplete: () => boolean;
-  currentSize: () => number;
-  waitForBytes: (n: number) => Promise<number>;
-  awaitDone: () => Promise<void>;
-}> {
+export async function ensureCached(videoId: string): Promise<{ path: string; size: number }> {
   if (!YT_ID_RE.test(videoId)) {
     throw new ExtractionError("invalid video id", "unavailable");
   }
@@ -251,50 +223,31 @@ export async function ensureStreaming(videoId: string): Promise<{
     const stats = await stat(final);
     const now = new Date();
     utimes(final, now, now).catch(() => {});
-    return {
-      path: final,
-      isComplete: () => true,
-      currentSize: () => stats.size,
-      waitForBytes: async () => stats.size,
-      awaitDone: async () => {},
-    };
+    return { path: final, size: stats.size };
   }
 
   let entry = inFlight.get(videoId);
   if (!entry) {
-    entry = { writtenBytes: 0, done: Promise.resolve(), complete: false, waiters: [] };
-    inFlight.set(videoId, entry);
+    const newEntry: CacheEntry = { writtenBytes: 0, done: Promise.resolve(), complete: false };
+    entry = newEntry;
+    inFlight.set(videoId, newEntry);
 
     const release = await acquireSlot();
-    startExtraction(videoId, entry);
-    entry.done
+    startExtraction(videoId, newEntry);
+    newEntry.done
       .catch(() => {})
       .finally(() => {
         release();
         // Keep the entry around briefly so late attachers still see the
         // final state, then drop it so future plays re-check the cache dir.
         setTimeout(() => {
-          if (inFlight.get(videoId) === entry) inFlight.delete(videoId);
+          if (inFlight.get(videoId) === newEntry) inFlight.delete(videoId);
         }, 5_000);
       });
   }
 
-  const capturedEntry = entry;
-  return {
-    path: capturedEntry.complete ? final : partPath(videoId),
-    isComplete: () => capturedEntry.complete,
-    currentSize: () => capturedEntry.writtenBytes,
-    waitForBytes: (n: number) =>
-      new Promise<number>((resolve, reject) => {
-        if (capturedEntry.writtenBytes >= n || capturedEntry.complete) {
-          resolve(capturedEntry.writtenBytes);
-          return;
-        }
-        capturedEntry.waiters.push(resolve);
-        capturedEntry.done.catch(reject);
-      }),
-    awaitDone: () => capturedEntry.done,
-  };
+  await entry.done;
+  return { path: final, size: entry.writtenBytes };
 }
 
 export { CONTENT_TYPE, ExtractionError };
