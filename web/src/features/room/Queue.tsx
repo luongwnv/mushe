@@ -17,6 +17,7 @@ import { CSS } from "@dnd-kit/utilities";
 import type { QueueItem } from "../../lib/types";
 import { formatDuration } from "./format";
 import { Icon } from "../../components/Icon";
+import { Marquee } from "../../components/Marquee";
 
 interface Props {
   items: QueueItem[];
@@ -78,8 +79,8 @@ function SortableRow({ item, index, voted, canRemove, onToggleVote, onRemove }: 
           />
         )}
         <div className="qmeta">
-          <div className="qtitle">{item.title}</div>
-          <div className="qartist">{item.artist}</div>
+          <Marquee text={item.title} className="qtitle" />
+          <div className="qartist ellipsis">{item.artist}</div>
         </div>
       </div>
 

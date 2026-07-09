@@ -3,6 +3,7 @@ import { useAuth } from "./lib/useAuth";
 import LoginPage from "./pages/LoginPage";
 import LobbyPage from "./pages/LobbyPage";
 import AuthCallback from "./pages/AuthCallback";
+import AdminPage from "./pages/AdminPage";
 import RoomPage from "./features/room/RoomPage";
 
 export default function App() {
@@ -26,6 +27,7 @@ export default function App() {
           <>
             <Route path="/" element={<LobbyPage />} />
             <Route path="/room/:code" element={<RoomPage />} />
+            <Route path="/admin" element={<AdminPage session={session} />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </>
         )}

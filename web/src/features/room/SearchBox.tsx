@@ -3,6 +3,7 @@ import { searchTracks } from "../../lib/resolver";
 import type { ResolvedTrack } from "../../lib/types";
 import { formatDuration } from "./format";
 import { Icon } from "../../components/Icon";
+import { Marquee } from "../../components/Marquee";
 
 interface Props {
   onAdd: (track: ResolvedTrack) => void;
@@ -49,7 +50,7 @@ export default function SearchBox({ onAdd, adding }: Props) {
       <div className="row">
         <div style={{ position: "relative", flex: 1 }}>
           <input
-            placeholder="Search a song, or paste a YouTube / Spotify link"
+            placeholder="Search a song"
             value={query}
             onChange={(e) => {
               setQuery(e.target.value);
@@ -100,6 +101,7 @@ export default function SearchBox({ onAdd, adding }: Props) {
                   background: "var(--panel-2)",
                   borderRadius: 8,
                   padding: "8px 10px",
+                  minWidth: 0,
                 }}
               >
                 <div className="row" style={{ gap: 10, minWidth: 0 }}>
@@ -112,11 +114,9 @@ export default function SearchBox({ onAdd, adding }: Props) {
                       style={{ borderRadius: 4, objectFit: "cover" }}
                     />
                   )}
-                  <div style={{ minWidth: 0 }}>
-                    <div style={{ whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                      {t.title}
-                    </div>
-                    <div className="muted" style={{ fontSize: 13 }}>
+                  <div style={{ minWidth: 0, flex: 1 }}>
+                    <Marquee text={t.title} />
+                    <div className="muted ellipsis" style={{ fontSize: 13 }}>
                       {t.artist}
                       {t.duration_ms ? ` · ${formatDuration(t.duration_ms)}` : ""}
                       {t.source === "spotify" ? " · via Spotify" : ""}

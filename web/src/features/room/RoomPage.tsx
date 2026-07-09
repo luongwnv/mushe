@@ -37,6 +37,14 @@ export default function RoomPage() {
   const [localPosMs, setLocalPosMs] = useState(0);
   const [errorNotice, setErrorNotice] = useState<string | null>(null);
   const [volume, setVolume] = useState(100); // local player volume 0..100
+  const [copied, setCopied] = useState<"code" | "link" | null>(null);
+
+  const copy = useCallback((kind: "code" | "link", text: string) => {
+    void navigator.clipboard.writeText(text).then(() => {
+      setCopied(kind);
+      setTimeout(() => setCopied((cur) => (cur === kind ? null : cur)), 1500);
+    });
+  }, []);
 
   // Player handle is held in state (not just a ref) so effects re-run when the
   // YouTube player finishes loading and the imperative handle becomes available.
@@ -48,15 +56,27 @@ export default function RoomPage() {
   useEffect(() => {
     if (!code) return;
     let cancelled = false;
+    // join_room is idempotent (on-conflict do-nothing), so calling it here
+    // covers both a fresh join-via-link and a reload/direct-URL visit —
+    // rooms_select_member below would otherwise reject non-members.
     supabase
-      .from("rooms")
-      .select("*")
-      .eq("code", code.toUpperCase())
-      .single()
-      .then(({ data, error }) => {
+      .rpc("join_room", { p_code: code.toUpperCase() })
+      .then(({ error: joinError }) => {
         if (cancelled) return;
-        if (error) setError(error.message);
-        else setRoom(data as Room);
+        if (joinError) {
+          setError(joinError.message);
+          return;
+        }
+        return supabase
+          .from("rooms")
+          .select("*")
+          .eq("code", code.toUpperCase())
+          .single()
+          .then(({ data, error }) => {
+            if (cancelled) return;
+            if (error) setError(error.message);
+            else setRoom(data as Room);
+          });
       });
     return () => {
       cancelled = true;
@@ -283,16 +303,38 @@ export default function RoomPage() {
               <div className="muted" style={{ fontSize: 12, textTransform: "uppercase" }}>
                 Share code
               </div>
-              <div
-                className="pixel-heading"
-                style={{
-                  marginTop: 4,
-                  fontSize: 24,
-                  letterSpacing: 3,
-                  color: "var(--accent-press)",
-                }}
-              >
-                {room.code}
+              <div className="row" style={{ justifyContent: "space-between", marginTop: 4 }}>
+                <div
+                  className="pixel-heading"
+                  style={{ fontSize: 24, letterSpacing: 3, color: "var(--accent-press)" }}
+                >
+                  {room.code}
+                </div>
+                <div className="row" style={{ gap: 8 }}>
+                  <button
+                    type="button"
+                    className="iconbtn"
+                    title="Copy room code"
+                    onClick={() => copy("code", room.code)}
+                    style={{ padding: 8 }}
+                  >
+                    <Icon name={copied === "code" ? "check" : "copy"} size={20} />
+                  </button>
+                  <button
+                    type="button"
+                    className="iconbtn"
+                    title="Copy invite link"
+                    onClick={() =>
+                      copy(
+                        "link",
+                        `${window.location.origin}${import.meta.env.BASE_URL}room/${room.code}`,
+                      )
+                    }
+                    style={{ padding: 8 }}
+                  >
+                    <Icon name={copied === "link" ? "check" : "link"} size={20} />
+                  </button>
+                </div>
               </div>
             </div>
             <div>

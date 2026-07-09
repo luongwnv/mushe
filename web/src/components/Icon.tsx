@@ -24,7 +24,10 @@ export type IconName =
   | "grip"
   | "tv"
   | "resize"
-  | "note-plus";
+  | "note-plus"
+  | "copy"
+  | "check"
+  | "link";
 
 const PATHS: Record<IconName, string> = {
   play: "M8 5v14l11-7z",
@@ -54,6 +57,9 @@ const PATHS: Record<IconName, string> = {
   tv: "M4 7h16v11H4zM9 21h6M8 3l4 4 4-4",
   resize: "M20 4h-6M20 4v6M20 4l-7 7",
   "note-plus": "M9 17V4.2l9-1.5v11.3M9 17a3 3 0 1 1-6 0 3 3 0 0 1 6 0zM18 14a3 3 0 1 1-6 0 3 3 0 0 1 6 0zM19 1v6M16 4h6",
+  copy: "M9 9h10v10H9zM5 15V5h10",
+  check: "M20 6 9 17l-5-5",
+  link: "M9 15 15 9M10.5 7.5l1.6-1.6a4 4 0 0 1 5.6 5.6l-1.6 1.6M13.5 16.5l-1.6 1.6a4 4 0 0 1-5.6-5.6l1.6-1.6",
 };
 
 const SOLID = new Set<IconName>(["play", "pause", "stop", "prev", "next", "up"]);

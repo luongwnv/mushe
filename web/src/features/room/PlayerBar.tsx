@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import type { PlaybackState, QueueItem } from "../../lib/types";
 import { formatDuration } from "./format";
 import { Icon } from "../../components/Icon";
+import { Marquee } from "../../components/Marquee";
 
 interface Props {
   playback: PlaybackState | null | undefined;
@@ -93,9 +94,7 @@ export default function PlayerBar({
           </span>
         </div>
 
-        <p className="ellipsis onair-cardsubtitle">
-          {artist} – {title}
-        </p>
+        <Marquee text={`${artist} – ${title}`} className="onair-cardsubtitle" />
 
         <div className="onair-status">
           <div className="row" style={{ gap: 6 }}>
@@ -186,7 +185,8 @@ export default function PlayerBar({
       <div className="onair-footer">
         <div className="onair-channel-wrap">
           <div className="onair-channel">
-            <span className="ellipsis">Next: {nextLabel}</span>
+            <span style={{ flex: "none" }}>Next:&nbsp;</span>
+            <Marquee text={nextLabel} className="onair-next-label" />
           </div>
         </div>
 
