@@ -1,105 +1,62 @@
 import type { ReactNode } from "react";
-import type { PresenceMeta, QueueItem } from "../../lib/types";
+import type { QueueItem } from "../../lib/types";
+import RetroWindow from "../../components/RetroWindow";
 
 interface Props {
   roomName: string;
-  /** The <Player> element (rendered by the parent so it can hold the ref). */
+  /** Unused visually now (audio-only player is mounted in RoomPage), kept for compat. */
   playerSlot: ReactNode;
-  /** Whether this client mounts an audible player (host, or follower in synced). */
   active: boolean;
   nowPlaying: QueueItem | null;
-  listeners: PresenceMeta[];
-  hostId: string;
 }
 
-// Right column — mirrors Spotify's "Now playing" panel: the video/player on top,
-// current track info, then who's listening.
-export default function RightPanel({
-  roomName,
-  playerSlot,
-  active,
-  nowPlaying,
-  listeners,
-  hostId,
-}: Props) {
+// Right column — a poolsuite.net-style "album art" window showing what's
+// currently spinning.
+export default function RightPanel({ nowPlaying, active }: Props) {
   return (
-    <aside className="col col-right">
-      <div className="col-scroll" style={{ display: "grid", gap: 18 }}>
-        <div className="muted" style={{ fontWeight: 700, color: "var(--text)" }}>
-          {roomName}
-        </div>
-
-        {/* The (audio-only, hidden) player mounts here. */}
-        {active ? (
-          playerSlot
-        ) : (
-          <div
-            style={{
-              aspectRatio: "16 / 9",
-              background: "var(--panel-2)",
-              borderRadius: 8,
-              display: "grid",
-              placeItems: "center",
-            }}
-            className="muted"
-          >
-            Host is the speaker in this room
+    <aside className="desktop-col desktop-col-right">
+      <RetroWindow title="now playing">
+        <div style={{ display: "grid", gap: 14, justifyItems: "center", textAlign: "center" }}>
+          {nowPlaying?.thumbnail_url ? (
+            <img
+              src={nowPlaying.thumbnail_url}
+              alt=""
+              style={{
+                width: "100%",
+                aspectRatio: "1 / 1",
+                objectFit: "cover",
+                borderRadius: 6,
+                border: "2px solid var(--border)",
+                boxShadow: "3px 3px 0 rgba(43,35,32,0.25)",
+              }}
+            />
+          ) : (
+            <div
+              style={{
+                width: "100%",
+                aspectRatio: "1 / 1",
+                background: "var(--panel-2)",
+                borderRadius: 6,
+                border: "2px solid var(--border)",
+                display: "grid",
+                placeItems: "center",
+              }}
+              className="muted pixel-heading"
+            >
+              ♪
+            </div>
+          )}
+          <div>
+            <div style={{ fontWeight: 700 }}>{nowPlaying ? nowPlaying.title : "Nothing playing"}</div>
+            <div className="muted" style={{ marginTop: 2 }}>{nowPlaying?.artist}</div>
           </div>
-        )}
-
-        {/* now playing */}
-        <div>
-          <h3 style={{ margin: "0 0 8px" }}>
-            {nowPlaying ? nowPlaying.title : "Nothing playing"}
-          </h3>
-          <div className="muted">{nowPlaying?.artist}</div>
+          {!active && (
+            <div className="muted" style={{ fontSize: 12 }}>
+              Host is the speaker in this room
+            </div>
+          )}
         </div>
-
-        {/* listeners */}
-        <div>
-          <h4 style={{ margin: "0 0 10px" }}>Listening now ({listeners.length})</h4>
-          <div style={{ display: "grid", gap: 8 }}>
-            {listeners.length === 0 && <span className="muted">No one here yet.</span>}
-            {listeners.map((l) => (
-              <div key={l.user_id} className="row" style={{ gap: 8 }}>
-                {l.avatar_url ? (
-                  <img
-                    src={l.avatar_url}
-                    alt=""
-                    width={28}
-                    height={28}
-                    style={{ borderRadius: "50%" }}
-                  />
-                ) : (
-                  <div
-                    aria-hidden
-                    style={{
-                      width: 28,
-                      height: 28,
-                      borderRadius: "50%",
-                      background: "var(--panel-2)",
-                      display: "grid",
-                      placeItems: "center",
-                      fontSize: 13,
-                    }}
-                  >
-                    {l.display_name.charAt(0).toUpperCase()}
-                  </div>
-                )}
-                <span>
-                  {l.display_name}
-                  {l.user_id === hostId && (
-                    <span className="muted" style={{ fontSize: 12 }}>
-                      {" "}
-                      · host
-                    </span>
-                  )}
-                </span>
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
+      </RetroWindow>
     </aside>
   );
 }

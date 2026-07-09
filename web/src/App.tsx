@@ -13,20 +13,23 @@ export default function App() {
   }
 
   return (
-    <Routes>
-      <Route path="/auth/callback" element={<AuthCallback />} />
-      {!session ? (
-        <>
-          <Route path="/login" element={<LoginPage />} />
-          <Route path="*" element={<Navigate to="/login" replace />} />
-        </>
-      ) : (
-        <>
-          <Route path="/" element={<LobbyPage />} />
-          <Route path="/room/:code" element={<RoomPage />} />
-          <Route path="*" element={<Navigate to="/" replace />} />
-        </>
-      )}
-    </Routes>
+    <>
+      <div className="sky" aria-hidden />
+      <Routes>
+        <Route path="/auth/callback" element={<AuthCallback />} />
+        {!session ? (
+          <>
+            <Route path="/login" element={<LoginPage />} />
+            <Route path="*" element={<Navigate to="/login" replace />} />
+          </>
+        ) : (
+          <>
+            <Route path="/" element={<LobbyPage />} />
+            <Route path="/room/:code" element={<RoomPage />} />
+            <Route path="*" element={<Navigate to="/" replace />} />
+          </>
+        )}
+      </Routes>
+    </>
   );
 }

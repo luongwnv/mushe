@@ -2,6 +2,7 @@ import { useState } from "react";
 import { searchTracks } from "../../lib/resolver";
 import type { ResolvedTrack } from "../../lib/types";
 import { formatDuration } from "./format";
+import { Icon } from "../../components/Icon";
 
 interface Props {
   onAdd: (track: ResolvedTrack) => void;
@@ -37,22 +38,48 @@ export default function SearchBox({ onAdd, adding }: Props) {
     setAddedIds((prev) => new Set(prev).add(track.source_id));
   }
 
+  function clear() {
+    setQuery("");
+    setResults([]);
+    setError(null);
+  }
+
   return (
     <div>
       <div className="row">
-        <input
-          placeholder="Search a song, or paste a YouTube / Spotify link"
-          value={query}
-          onChange={(e) => {
-            setQuery(e.target.value);
-            if (!e.target.value.trim()) {
-              setResults([]);
-              setError(null);
-            }
-          }}
-          onKeyDown={(e) => e.key === "Enter" && void run()}
-          style={{ flex: 1 }}
-        />
+        <div style={{ position: "relative", flex: 1 }}>
+          <input
+            placeholder="Search a song, or paste a YouTube / Spotify link"
+            value={query}
+            onChange={(e) => {
+              setQuery(e.target.value);
+              if (!e.target.value.trim()) {
+                setResults([]);
+                setError(null);
+              }
+            }}
+            onKeyDown={(e) => e.key === "Enter" && void run()}
+            style={{ width: "100%", paddingRight: 40 }}
+          />
+          {query && (
+            <button
+              type="button"
+              aria-label="Clear search"
+              title="Clear search"
+              onClick={clear}
+              className="iconbtn"
+              style={{
+                position: "absolute",
+                right: 4,
+                top: "50%",
+                transform: "translateY(-50%)",
+                padding: 6,
+              }}
+            >
+              <Icon name="x" size={18} />
+            </button>
+          )}
+        </div>
         <button onClick={() => void run()} disabled={loading || !query.trim()}>
           {loading ? "Searching…" : "Search"}
         </button>

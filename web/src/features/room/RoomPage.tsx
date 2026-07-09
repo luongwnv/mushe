@@ -4,7 +4,7 @@ import { supabase } from "../../lib/supabaseClient";
 import { useAuth } from "../../lib/useAuth";
 import { useProfile } from "../../lib/useProfile";
 import { expectedPositionMs, isoToServerMs, syncClock } from "../../lib/sync";
-import type { PlaybackMode, PresenceMeta, Room } from "../../lib/types";
+import type { PlaybackMode, PresenceMeta, ResolvedTrack, Room } from "../../lib/types";
 import { useRoomChannel } from "./useRoomChannel";
 import { useMyVotes, usePlayback, useQueue } from "./useRoomData";
 import { useQueueActions } from "./useQueueActions";
@@ -16,6 +16,7 @@ import Player, { type PlayerHandle } from "./Player";
 import RightPanel from "./RightPanel";
 import PlayerBar from "./PlayerBar";
 import { Icon } from "../../components/Icon";
+import RetroWindow from "../../components/RetroWindow";
 
 // Phase 4/5: full collaborative playback. The host is the authoritative clock;
 // every audible client reconciles to playback_state via usePlaybackSync.
@@ -27,13 +28,12 @@ export default function RoomPage() {
 
   const [room, setRoom] = useState<Room | null>(null);
   const [error, setError] = useState<string | null>(null);
-  // "tap to listen" gesture done — pre-satisfied if the user just clicked
-  // Create/Join on the lobby, since that click is itself a user gesture.
-  const [unlocked, setUnlocked] = useState(() => {
-    const preUnlocked = sessionStorage.getItem("mushe:autoplay-unlocked") === "1";
-    if (preUnlocked) sessionStorage.removeItem("mushe:autoplay-unlocked");
-    return preUnlocked;
-  });
+  // "tap to listen" gesture done — pre-satisfied if the user has ever
+  // unlocked audio on this site before (this room or any other), since
+  // browsers remember per-origin autoplay permission across page loads.
+  const [unlocked, setUnlocked] = useState(
+    () => localStorage.getItem("mushe:autoplay-unlocked") === "1",
+  );
   const [localPosMs, setLocalPosMs] = useState(0);
   const [errorNotice, setErrorNotice] = useState<string | null>(null);
   const [volume, setVolume] = useState(100); // local player volume 0..100
@@ -87,6 +87,7 @@ export default function RoomPage() {
   const isHost = session?.user.id === room?.host_id;
   const nowPlaying = queue.find((q) => q.status === "playing") ?? null;
   const queued = queue.filter((q) => q.status === "queued");
+  const nextUp = queued[0] ?? null;
 
   const { addTrack, removeTrack, toggleVote, reorderQueue } = useQueueActions({
     roomId: room?.id ?? "",
@@ -96,6 +97,20 @@ export default function RoomPage() {
     roomId: room?.id ?? "",
     currentItemId: playback?.current_item_id ?? null,
   });
+
+  // Adding the first track to an idle room should start playback right away
+  // instead of leaving it queued until someone hits Play.
+  const wasIdle = !playback?.current_item_id;
+  const onAddTrack = useCallback(
+    (track: ResolvedTrack) => {
+      addTrack.mutate(track, {
+        onSuccess: () => {
+          if (wasIdle) transport.next.mutate();
+        },
+      });
+    },
+    [addTrack, transport, wasIdle],
+  );
 
   // Whether THIS client should produce audio: host always; followers only in
   // synced mode. (host_only => non-host players stay muted.)
@@ -172,20 +187,20 @@ export default function RoomPage() {
     [transport, playback],
   );
 
+  // Not wired into PlayerBar's UI right now (shuffle/repeat buttons were
+  // removed), kept here since the backend mutations still exist and this
+  // may get a UI again later.
   const onToggleShuffle = useCallback(() => {
     transport.setShuffle.mutate(!(playback?.shuffle ?? false));
   }, [transport, playback]);
+  void onToggleShuffle;
 
   const onCycleRepeat = useCallback(() => {
     const cur = playback?.repeat_mode ?? "off";
     const next = cur === "off" ? "all" : cur === "all" ? "one" : "off";
     transport.setRepeat.mutate(next);
   }, [transport, playback]);
-
-  const onFullscreen = useCallback(() => {
-    const el = document.querySelector(".col-right iframe") as HTMLElement | null;
-    void el?.requestFullscreen?.();
-  }, []);
+  void onCycleRepeat;
 
   const onChangeMode = useCallback(
     async (next: PlaybackMode) => {
@@ -199,10 +214,10 @@ export default function RoomPage() {
   if (error) {
     return (
       <div className="center">
-        <div className="card">
-          <p style={{ color: "#ff6b6b" }}>Couldn’t open room: {error}</p>
+        <RetroWindow title="error" className="card">
+          <p style={{ color: "#c23b2f" }}>Couldn’t open room: {error}</p>
           <button onClick={() => navigate("/")}>Back to lobby</button>
-        </div>
+        </RetroWindow>
       </div>
     );
   }
@@ -220,73 +235,61 @@ export default function RoomPage() {
     : 0;
   const displayPosMs = active ? localPosMs : sharedExpectedMs;
 
-  // The player element — rendered once here so playerRef stays in this component
-  // (the sync loop needs it). Passed into the right panel's slot.
+  // The (audio-only, hidden) player — rendered once here so playerRef stays in
+  // this component (the sync loop needs it).
   const playerSlot = (
-    <div>
-      {!unlocked && (
-        <button onClick={() => setUnlocked(true)} style={{ marginBottom: 10, width: "100%" }}>
-          Tap to listen
-        </button>
-      )}
-      <Player
-        ref={playerRef}
-        audible={unlocked}
-        volume={volume}
-        onReady={() => setPlayer(playerRef.current)}
-        onEnded={handleEnded}
-        onError={handleError}
-      />
-      {errorNotice && (
-        <p style={{ fontSize: 13, marginTop: 6, color: "#ffcc66" }}>{errorNotice}</p>
-      )}
-    </div>
+    <Player
+      ref={playerRef}
+      audible={unlocked}
+      volume={volume}
+      onReady={() => setPlayer(playerRef.current)}
+      onEnded={handleEnded}
+      onError={handleError}
+    />
   );
 
   return (
-    <div className="app-shell">
+    <div className="desktop">
       {/* top bar */}
-      <header className="topbar">
+      <header className="desktop-topbar">
         <button className="iconbtn" onClick={() => navigate("/")} title="Home">
           <Icon name="home" size={18} />
         </button>
-        <div className="pill search" style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
+        <span className="logo">mushe</span>
+        <div className="pill" style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
           <Icon name="search" size={15} /> {room.name} · code {room.code}
         </div>
-        <span
-          className="muted"
-          style={{ color: connected ? "var(--accent)" : "var(--muted)", fontSize: 13 }}
-        >
-          {connected ? "● live" : "connecting…"}
+        <div className="spacer" />
+        <span className={connected ? "pill live-pill" : "pill"}>
+          {connected && <span aria-hidden className="live-dot" />}
+          {connected ? "live" : "connecting…"}
         </span>
         <div className="avatar" title={isHost ? "Host" : "Listener"}>
           {(profile?.display_name ?? "?").charAt(0).toUpperCase()}
         </div>
       </header>
 
-      {/* 3 columns */}
-      <div className="cols">
-        {/* LEFT: room info / share */}
-        <nav className="col col-left">
-          <div className="col-scroll" style={{ display: "grid", gap: 16 }}>
+      {/* LEFT: room info / share */}
+      <nav className="desktop-col desktop-col-left">
+        <RetroWindow title="this room">
+          <div style={{ display: "grid", gap: 16 }}>
             <div className="row" style={{ justifyContent: "space-between" }}>
-              <strong>This room</strong>
+              <strong>{room.name}</strong>
               <button className="secondary" onClick={() => navigate("/")}>
                 Leave
               </button>
             </div>
             <div>
-              <div style={{ fontSize: 22, fontWeight: 700 }}>{room.name}</div>
-              <div className="muted" style={{ marginTop: 4 }}>
+              <div className="muted" style={{ fontSize: 12, textTransform: "uppercase" }}>
                 Share code
               </div>
               <div
+                className="pixel-heading"
                 style={{
                   marginTop: 4,
-                  fontSize: 26,
-                  fontWeight: 800,
-                  letterSpacing: 2,
-                  color: "var(--accent)",
+                  fontSize: 24,
+                  letterSpacing: 3,
+                  color: "var(--accent-press)",
                 }}
               >
                 {room.code}
@@ -318,43 +321,88 @@ export default function RoomPage() {
               playback.
             </div>
           </div>
-        </nav>
+        </RetroWindow>
 
-        {/* MIDDLE: header + search + queue table */}
-        <main className="col col-mid">
-          <div className="room-header">
-            <div className="row" style={{ gap: 16 }}>
-              {playback?.is_playing ? (
-                <button className="play-fab" onClick={onPause} title="Pause">
-                  <Icon name="pause" size={22} />
-                </button>
-              ) : (
-                <button
-                  className="play-fab"
-                  onClick={onPlay}
-                  title="Play"
-                  disabled={!nowPlaying && queued.length === 0}
-                >
-                  <Icon name="play" size={22} />
-                </button>
-              )}
-              <div>
-                <div className="muted" style={{ fontSize: 12, textTransform: "uppercase" }}>
-                  Collaborative queue
-                </div>
-                <h1 style={{ margin: "2px 0" }}>{room.name}</h1>
-                <div className="muted" style={{ fontSize: 13 }}>
-                  {listeners.length} listening · {queued.length} in queue
-                </div>
+        <RetroWindow title={`listening now (${listeners.length})`}>
+          <div style={{ display: "grid", gap: 10 }}>
+            {listeners.length === 0 && <span className="muted">No one here yet.</span>}
+            {listeners.map((l) => (
+              <div key={l.user_id} className="listener-row">
+                {l.avatar_url ? (
+                  <img
+                    src={l.avatar_url}
+                    alt=""
+                    width={26}
+                    height={26}
+                    style={{ borderRadius: "50%", border: "1.5px solid var(--border)" }}
+                  />
+                ) : (
+                  <div className="listener-avatar" aria-hidden>
+                    {l.display_name.charAt(0).toUpperCase()}
+                  </div>
+                )}
+                <span>
+                  {l.display_name}
+                  {l.user_id === room.host_id && (
+                    <span className="muted" style={{ fontSize: 12 }}>
+                      {" "}
+                      · host
+                    </span>
+                  )}
+                </span>
               </div>
-            </div>
+            ))}
           </div>
+        </RetroWindow>
+      </nav>
 
-          <div className="col-scroll" style={{ display: "grid", gap: 20 }}>
+      {/* MIDDLE: radio player + search + queue */}
+      <main className="desktop-col desktop-col-mid">
+        {active && !unlocked && (
+          <button
+            onClick={() => {
+              localStorage.setItem("mushe:autoplay-unlocked", "1");
+              setUnlocked(true);
+            }}
+            style={{ width: "100%" }}
+          >
+            Tap to listen
+          </button>
+        )}
+        <PlayerBar
+          playback={playback}
+          currentItem={nowPlaying}
+          nextItem={nextUp}
+          hasQueued={queued.length > 0}
+          positionMs={displayPosMs}
+          volume={volume}
+          canRemoveCurrent={isHost || nowPlaying?.added_by === session?.user.id}
+          onPlay={onPlay}
+          onPause={onPause}
+          onNext={onSkip}
+          onPrevious={onPrevious}
+          onSeek={onSeek}
+          onVolume={setVolume}
+          onRemoveCurrent={() => nowPlaying && removeTrack.mutate(nowPlaying.id)}
+        />
+
+        {/* the (audio-only, hidden) player mounts here */}
+        <div style={{ display: "none" }}>{active ? playerSlot : null}</div>
+        {!active && (
+          <div className="muted" style={{ fontSize: 12, textAlign: "center" }}>
+            Host is the speaker in this room
+          </div>
+        )}
+        {errorNotice && (
+          <p style={{ fontSize: 13, textAlign: "center", color: "#c23b2f" }}>{errorNotice}</p>
+        )}
+
+        <RetroWindow title="collaborative queue" className="grow" bodyClassName="scroll">
+          <div style={{ display: "grid", gap: 18 }}>
             <div>
-              <SearchBox onAdd={(t) => addTrack.mutate(t)} adding={addTrack.isPending} />
+              <SearchBox onAdd={onAddTrack} adding={addTrack.isPending} />
               {addTrack.isError && (
-                <p style={{ color: "#ff6b6b" }}>{(addTrack.error as Error).message}</p>
+                <p style={{ color: "#c23b2f" }}>{(addTrack.error as Error).message}</p>
               )}
             </div>
 
@@ -368,37 +416,15 @@ export default function RoomPage() {
               onReorder={(orderedIds) => reorderQueue.mutate(orderedIds)}
             />
           </div>
-        </main>
+        </RetroWindow>
+      </main>
 
-        {/* RIGHT: player + now playing + listeners */}
-        <RightPanel
-          roomName={room.name}
-          playerSlot={playerSlot}
-          active={active}
-          nowPlaying={nowPlaying}
-          listeners={listeners}
-          hostId={room.host_id}
-        />
-      </div>
-
-      {/* bottom player bar */}
-      <PlayerBar
-        playback={playback}
-        currentItem={nowPlaying}
-        hasQueued={queued.length > 0}
-        positionMs={displayPosMs}
-        volume={volume}
-        canRemoveCurrent={isHost || nowPlaying?.added_by === session?.user.id}
-        onPlay={onPlay}
-        onPause={onPause}
-        onNext={onSkip}
-        onPrevious={onPrevious}
-        onSeek={onSeek}
-        onToggleShuffle={onToggleShuffle}
-        onCycleRepeat={onCycleRepeat}
-        onVolume={setVolume}
-        onRemoveCurrent={() => nowPlaying && removeTrack.mutate(nowPlaying.id)}
-        onFullscreen={onFullscreen}
+      {/* RIGHT: now playing art */}
+      <RightPanel
+        roomName={room.name}
+        playerSlot={null}
+        active={active}
+        nowPlaying={nowPlaying}
       />
     </div>
   );

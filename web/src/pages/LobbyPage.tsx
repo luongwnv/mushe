@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "../lib/supabaseClient";
 import { signOut } from "../lib/useAuth";
+import RetroWindow from "../components/RetroWindow";
 
 export default function LobbyPage() {
   const navigate = useNavigate();
@@ -11,9 +12,10 @@ export default function LobbyPage() {
   const [error, setError] = useState<string | null>(null);
 
   // Clicking Create/Join is itself a user gesture — mark autoplay as
-  // pre-unlocked so RoomPage can skip its "tap to listen" prompt.
+  // unlocked (persists across reloads/rooms) so RoomPage can skip its
+  // "tap to listen" prompt.
   function markAutoplayUnlocked() {
-    sessionStorage.setItem("mushe:autoplay-unlocked", "1");
+    localStorage.setItem("mushe:autoplay-unlocked", "1");
   }
 
   async function createRoom() {
@@ -45,15 +47,21 @@ export default function LobbyPage() {
 
   return (
     <div className="center">
-      <div className="card">
-        <div className="row" style={{ justifyContent: "space-between" }}>
-          <h1 style={{ margin: 0 }}>mushe</h1>
-          <button className="secondary" onClick={() => void signOut()}>
+      <RetroWindow
+        title="mushe — lobby"
+        className="card"
+        right={
+          <button className="secondary" style={{ padding: "3px 10px" }} onClick={() => void signOut()}>
             Sign out
           </button>
-        </div>
+        }
+      >
+        <h1 className="pixel-heading" style={{ margin: "0 0 4px", fontSize: 22 }}>
+          mushe
+        </h1>
+        <p className="muted" style={{ marginTop: 0 }}>Listen to music together, in real time.</p>
 
-        <h3>Create a room</h3>
+        <h3 className="pixel-heading" style={{ fontSize: 14 }}>Create a room</h3>
         <div className="row">
           <input
             placeholder="Room name (optional)"
@@ -66,7 +74,7 @@ export default function LobbyPage() {
           </button>
         </div>
 
-        <h3>Join a room</h3>
+        <h3 className="pixel-heading" style={{ fontSize: 14 }}>Join a room</h3>
         <div className="row">
           <input
             placeholder="Room code"
@@ -80,9 +88,9 @@ export default function LobbyPage() {
         </div>
 
         {error && (
-          <p style={{ color: "#ff6b6b", marginTop: 16 }}>{error}</p>
+          <p style={{ color: "#c23b2f", marginTop: 16 }}>{error}</p>
         )}
-      </div>
+      </RetroWindow>
     </div>
   );
 }
